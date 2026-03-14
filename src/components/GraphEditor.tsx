@@ -17,6 +17,7 @@ import ReactFlow, {
   EdgeLabelRenderer,
   getBezierPath,
   BaseEdge,
+  Position,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import type { GraphNode, GraphEdge } from "../types";
@@ -176,6 +177,8 @@ function GraphEditorInner({ initialNodes, initialEdges, onGraphChange }: GraphEd
             meta: { name: newName, description: newDescription },
             label: createNodeLabel(newId, newName, newDescription, stableDelete, stableEdit, stableAddChild),
           },
+          sourcePosition: Position.Bottom,
+          targetPosition: Position.Top,
           style: { width: NODE_WIDTH },
         },
       ];
@@ -258,6 +261,8 @@ function GraphEditorInner({ initialNodes, initialEdges, onGraphChange }: GraphEd
             meta: { name: newName, description: newDescription },
             label: createNodeLabel(newId, newName, newDescription, stableDelete, stableEdit, stableAddChild),
           },
+          sourcePosition: Position.Bottom,
+          targetPosition: Position.Top,
           style: { width: NODE_WIDTH },
         },
       ]);
@@ -303,6 +308,8 @@ function GraphEditorInner({ initialNodes, initialEdges, onGraphChange }: GraphEd
             meta: { name: node.name, description: desc },
             label: createNodeLabel(node.id, node.name, desc, stableDelete, stableEdit, stableAddChild),
           },
+          sourcePosition: Position.Bottom,
+          targetPosition: Position.Top,
           style: { width: NODE_WIDTH },
         };
       }),

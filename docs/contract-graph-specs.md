@@ -155,6 +155,10 @@ Plain textANTLR4BashCC#CSSCoffeeScriptCMakeDartDjangoDockerEJSErlangGitGoGraphQL
 
 The new node receives a temporary name such as New Step. The user can then edit the node.
 
+### Edge Direction Convention
+
+Edges should start from the bottom of the source node and end at the top of the target node. This applies both when dragging a connection manually and when using the plus button to create a child node. Following this convention keeps the graph visually consistent and makes the flow direction immediately clear.
+
 ### Deleting Connections
 
 Clicking an edge selects it and reveals a delete button at the midpoint of the edge. Clicking the button removes the edge. This allows users to remove connections without deleting the nodes themselves.
