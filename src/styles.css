@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro:ital,wght@0,300;0,400;0,700;1,400&display=swap');
+
 *,
 *::before,
 *::after {
@@ -6,13 +8,14 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #0f172a;
-  background: radial-gradient(circle at top, #e0f2fe 0, #f8fafc 50%, #ffffff 100%);
+  font-family: "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #222;
+  background: #e9f4fa;
 }
 
 .app-root {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   display: flex;
   align-items: stretch;
   justify-content: center;
@@ -25,21 +28,23 @@ body {
   gap: 16px;
   width: 100%;
   max-width: 1400px;
-  background-color: rgba(255, 255, 255, 0.9);
-  border-radius: 16px;
-  box-shadow:
-    0 18px 40px rgba(15, 23, 42, 0.16),
-    0 0 0 1px rgba(148, 163, 184, 0.2);
+  height: 100%;
+  min-height: 0;
+  background-color: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08);
   overflow: hidden;
 }
 
 .app-sidebar {
   padding: 20px 20px 16px 20px;
-  border-right: 1px solid rgba(148, 163, 184, 0.4);
-  background: linear-gradient(180deg, #eff6ff 0%, #f8fafc 50%, #ffffff 100%);
+  border-right: 1px solid #dee2e6;
+  background: #f6f6f6;
   display: flex;
   flex-direction: column;
   gap: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .sidebar-split {
@@ -60,7 +65,7 @@ body {
 }
 
 .sidebar-pane--bottom {
-  border-top: 1px solid rgba(148, 163, 184, 0.45);
+  border-top: 1px solid #dee2e6;
   padding-top: 10px;
 }
 
@@ -77,12 +82,8 @@ body {
   width: 56px;
   height: 3px;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.9);
-  box-shadow:
-    0 0 0 1px rgba(248, 250, 252, 0.9),
-    0 2px 4px rgba(15, 23, 42, 0.35);
+  background: #ced4da;
 }
-
 
 .app-main {
   padding: 16px;
@@ -91,16 +92,19 @@ body {
 }
 
 .app-title {
-  font-size: 1.3rem;
-  font-weight: 600;
+  font-size: 1.2rem;
+  font-weight: 700;
   margin: 0 0 6px 0;
+  color: #222;
 }
 
 .app-subtitle {
   margin: 0;
   font-size: 0.9rem;
-  color: #475569;
+  color: #555;
 }
+
+/* Chat panel */
 
 .chat-panel {
   display: flex;
@@ -117,71 +121,67 @@ body {
 
 .chat-label {
   font-size: 0.85rem;
-  font-weight: 500;
-  color: #1f2937;
+  font-weight: 600;
+  color: #222;
 }
 
 .chat-textarea {
   resize: vertical;
   min-height: 140px;
   padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid #cbd5f5;
+  border-radius: 6px;
+  border: 1px solid #ced4da;
   font-family: inherit;
   font-size: 0.9rem;
-  line-height: 1.4;
+  line-height: 1.5;
   outline: none;
-  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0);
+  background: #fff;
+  color: #222;
 }
 
 .chat-textarea:focus {
-  border-color: #2563eb;
-  box-shadow:
-    0 0 0 1px rgba(37, 99, 235, 0.8),
-    0 0 0 4px rgba(191, 219, 254, 0.9);
+  border-color: #158cba;
+  box-shadow: 0 0 0 3px rgba(21, 140, 186, 0.2);
 }
 
 .chat-button {
   margin-top: 6px;
-  padding: 8px 10px;
-  border-radius: 999px;
+  padding: 8px 16px;
+  border-radius: 6px;
   border: none;
-  background: linear-gradient(135deg, #2563eb, #4f46e5);
-  color: white;
-  font-weight: 500;
+  background: #158cba;
+  color: #fff;
+  font-family: inherit;
+  font-weight: 700;
   font-size: 0.9rem;
   cursor: pointer;
-  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.4);
-  transition:
-    transform 120ms ease,
-    box-shadow 120ms ease,
-    filter 80ms ease;
+  transition: background 120ms ease, transform 80ms ease, box-shadow 120ms ease;
+  box-shadow: 0 2px 6px rgba(21, 140, 186, 0.3);
 }
 
 .chat-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.45);
-  filter: brightness(1.04);
+  background: #1279a3;
+  box-shadow: 0 4px 10px rgba(21, 140, 186, 0.35);
 }
 
 .chat-button:active {
   transform: translateY(1px);
-  box-shadow: 0 6px 12px rgba(15, 23, 42, 0.35);
+  box-shadow: none;
 }
 
 .chat-hint {
   font-size: 0.8rem;
-  color: #4b5563;
-  background: rgba(239, 246, 255, 0.9);
-  border-radius: 10px;
+  color: #555;
+  background: #e3f4fb;
+  border-radius: 6px;
   padding: 8px 10px;
-  border: 1px dashed rgba(96, 165, 250, 0.8);
+  border: 1px solid #c8eaf7;
 }
 
 .chat-history {
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px solid rgba(148, 163, 184, 0.5);
+  border-top: 1px solid #dee2e6;
 }
 
 .chat-history h2 {
@@ -193,8 +193,10 @@ body {
   margin: 0;
   padding-left: 18px;
   font-size: 0.8rem;
-  color: #4b5563;
+  color: #555;
 }
+
+/* Generated text panel */
 
 .generated-text-panel {
   display: flex;
@@ -204,21 +206,58 @@ body {
 
 .generated-text-body {
   margin-top: 4px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.7);
-  background: rgba(255, 255, 255, 0.9);
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+  background: #fff;
   font-size: 0.85rem;
-  color: #111827;
+  color: #222;
   min-height: 180px;
-  white-space: pre-wrap;
+  overflow-y: auto;
+}
+
+.generated-text-content h1,
+.generated-text-content h2,
+.generated-text-content h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 14px 0 4px 0;
+  color: #158cba;
+}
+
+.generated-text-content h1:first-child,
+.generated-text-content h2:first-child,
+.generated-text-content h3:first-child {
+  margin-top: 0;
+}
+
+.generated-text-content p {
+  margin: 0 0 8px 0;
+  line-height: 1.6;
+}
+
+.generated-text-content ol,
+.generated-text-content ul {
+  margin: 0 0 8px 0;
+  padding-left: 18px;
+  line-height: 1.6;
+}
+
+.generated-text-content li {
+  margin-bottom: 4px;
+}
+
+.generated-text-content strong {
+  font-weight: 700;
 }
 
 .generated-text-empty {
   margin: 0;
   font-size: 0.8rem;
-  color: #6b7280;
+  color: #999;
 }
+
+/* API key */
 
 .api-key-row {
   display: flex;
@@ -228,8 +267,8 @@ body {
 
 .api-key-label {
   font-size: 0.8rem;
-  font-weight: 500;
-  color: #374151;
+  font-weight: 600;
+  color: #333;
 }
 
 .api-key-field {
@@ -241,65 +280,73 @@ body {
   flex: 1;
   min-width: 0;
   padding: 5px 8px;
-  border-radius: 8px;
-  border: 1px solid rgba(148, 163, 184, 0.9);
+  border-radius: 6px;
+  border: 1px solid #ced4da;
   font-size: 0.8rem;
   font-family: monospace;
   outline: none;
   background: #fff;
+  color: #222;
 }
 
 .api-key-input:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(191, 219, 254, 0.9);
+  border-color: #158cba;
+  box-shadow: 0 0 0 3px rgba(21, 140, 186, 0.2);
 }
 
 .api-key-toggle {
-  padding: 4px 8px;
+  padding: 4px 10px;
   border-radius: 6px;
-  border: 1px solid rgba(148, 163, 184, 0.8);
-  background: #f9fafb;
+  border: 1px solid #ced4da;
+  background: #f0f0f0;
   font-size: 0.75rem;
   cursor: pointer;
   white-space: nowrap;
+  font-family: inherit;
+  color: #333;
+}
+
+.api-key-toggle:hover {
+  background: #e2e2e2;
 }
 
 .api-key-saved {
   font-size: 0.72rem;
-  color: #16a34a;
+  color: #28b62c;
 }
 
+/* Generate button */
+
 .generate-button {
-  padding: 9px 12px;
-  border-radius: 999px;
+  padding: 9px 16px;
+  border-radius: 6px;
   border: none;
-  background: linear-gradient(135deg, #059669, #0284c7);
-  color: white;
-  font-weight: 600;
+  background: #28b62c;
+  color: #fff;
+  font-family: inherit;
+  font-weight: 700;
   font-size: 0.9rem;
   cursor: pointer;
-  box-shadow: 0 8px 18px rgba(5, 150, 105, 0.35);
-  transition:
-    transform 120ms ease,
-    box-shadow 120ms ease,
-    filter 80ms ease;
+  transition: background 120ms ease, transform 80ms ease, box-shadow 120ms ease;
+  box-shadow: 0 2px 6px rgba(40, 182, 44, 0.3);
 }
 
 .generate-button:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 24px rgba(5, 150, 105, 0.4);
-  filter: brightness(1.05);
+  background: #23a127;
+  box-shadow: 0 4px 10px rgba(40, 182, 44, 0.35);
 }
 
 .generate-button:active:not(:disabled) {
   transform: translateY(1px);
-  box-shadow: 0 4px 8px rgba(15, 23, 42, 0.3);
+  box-shadow: none;
 }
 
 .generate-button:disabled {
-  opacity: 0.7;
+  opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* Graph editor */
 
 .graph-editor {
   display: flex;
@@ -319,64 +366,49 @@ body {
 .graph-header-text h2 {
   margin: 0;
   font-size: 1rem;
+  font-weight: 700;
+  color: #222;
 }
 
 .graph-caption {
   margin: 0;
   font-size: 0.8rem;
-  color: #6b7280;
+  color: #999;
 }
 
 .graph-add-button {
-  border-radius: 999px;
-  border: none;
-  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #158cba;
+  padding: 4px 12px;
   font-size: 0.8rem;
-  font-weight: 500;
-  background: rgba(37, 99, 235, 0.06);
-  color: #1d4ed8;
+  font-weight: 600;
+  font-family: inherit;
+  background: transparent;
+  color: #158cba;
   cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  box-shadow: 0 0 0 1px rgba(129, 140, 248, 0.5);
-  transition:
-    background-color 120ms ease,
-    transform 80ms ease,
-    box-shadow 120ms ease;
+  transition: background 100ms ease;
 }
 
 .graph-add-button:hover {
-  background: rgba(37, 99, 235, 0.12);
-  transform: translateY(-0.5px);
-  box-shadow:
-    0 1px 3px rgba(15, 23, 42, 0.25),
-    0 0 0 1px rgba(129, 140, 248, 0.8);
-}
-
-.graph-add-button:active {
-  transform: translateY(0.5px);
-  box-shadow: 0 0 0 1px rgba(129, 140, 248, 0.7);
+  background: #e3f4fb;
 }
 
 .graph-canvas {
   flex: 1;
   min-height: 420px;
-  border-radius: 14px;
+  border-radius: 8px;
   overflow: hidden;
-  border: 1px solid rgba(148, 163, 184, 0.6);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.6),
-    0 16px 35px rgba(15, 23, 42, 0.25);
+  border: 1px solid #dee2e6;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .graph-edit-panel {
   margin: 4px 2px 8px 2px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.6);
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.15);
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #ced4da;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   font-size: 0.8rem;
 }
 
@@ -384,31 +416,31 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .graph-edit-label {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #4b5563;
+  color: #555;
 }
 
 .graph-edit-input,
 .graph-edit-textarea {
   border-radius: 6px;
-  border: 1px solid rgba(148, 163, 184, 0.9);
-  padding: 4px 6px;
+  border: 1px solid #ced4da;
+  padding: 5px 8px;
   font-size: 0.8rem;
   font-family: inherit;
   outline: none;
+  color: #222;
+  background: #fff;
 }
 
 .graph-edit-input:focus,
 .graph-edit-textarea:focus {
-  border-color: #2563eb;
-  box-shadow:
-    0 0 0 1px rgba(37, 99, 235, 0.7),
-    0 0 0 3px rgba(191, 219, 254, 0.9);
+  border-color: #158cba;
+  box-shadow: 0 0 0 3px rgba(21, 140, 186, 0.2);
 }
 
 .graph-edit-textarea {
@@ -423,28 +455,39 @@ body {
 }
 
 .graph-edit-button {
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.8);
-  padding: 4px 10px;
-  font-size: 0.75rem;
-  background: #f9fafb;
+  border-radius: 6px;
+  border: 1px solid #ced4da;
+  padding: 5px 12px;
+  font-size: 0.8rem;
+  font-family: inherit;
+  background: #f0f0f0;
+  color: #333;
   cursor: pointer;
+  transition: background 100ms ease;
+}
+
+.graph-edit-button:hover {
+  background: #e2e2e2;
 }
 
 .graph-edit-button--primary {
-  background: #2563eb;
-  color: #ffffff;
-  border-color: #2563eb;
+  background: #158cba;
+  color: #fff;
+  border-color: #158cba;
 }
+
+.graph-edit-button--primary:hover {
+  background: #1279a3;
+}
+
+/* Graph nodes */
 
 .graph-node {
   padding: 8px 10px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #f9fafb, #eff6ff);
-  border: 1px solid rgba(148, 163, 184, 0.8);
-  box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.1),
-    0 0 0 1px rgba(255, 255, 255, 0.6);
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid #ced4da;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .graph-node-header {
@@ -456,8 +499,8 @@ body {
 
 .graph-node-title {
   font-size: 0.85rem;
-  font-weight: 600;
-  color: #111827;
+  font-weight: 700;
+  color: #222;
 }
 
 .graph-node-actions {
@@ -467,10 +510,10 @@ body {
 }
 
 .graph-node-action-btn {
-  border: none;
-  border-radius: 999px;
-  width: 18px;
-  height: 18px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  width: 20px;
+  height: 20px;
   padding: 0;
   font-size: 0.75rem;
   line-height: 1;
@@ -478,16 +521,34 @@ body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  background: rgba(37, 99, 235, 0.06);
-  color: #1d4ed8;
+  background: #f0f0f0;
+  color: #333;
+  transition: background 100ms ease;
+}
+
+.graph-node-action-btn:hover {
+  background: #e2e2e2;
 }
 
 .graph-node-action-btn--danger {
-  background: rgba(239, 68, 68, 0.06);
-  color: #b91c1c;
+  background: #ffd9d7;
+  border-color: #ffb3af;
+  color: #ff4136;
 }
 
-/* Hide ReactFlow connection handles until node is hovered or selected */
+.graph-node-action-btn--danger:hover {
+  background: #ffb3af;
+}
+
+.graph-node-list {
+  margin: 4px 0 0 0;
+  padding-left: 16px;
+  font-size: 0.75rem;
+  color: #555;
+  line-height: 1.5;
+}
+
+/* ReactFlow handle visibility */
 .react-flow__handle {
   opacity: 0;
   transition: opacity 150ms ease;
@@ -498,13 +559,6 @@ body {
   opacity: 1;
 }
 
-.graph-node-list {
-  margin: 0;
-  padding-left: 16px;
-  font-size: 0.75rem;
-  color: #374151;
-}
-
 @media (max-width: 960px) {
   .app-layout {
     grid-template-columns: 1fr;
@@ -512,7 +566,6 @@ body {
 
   .app-sidebar {
     border-right: none;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.4);
+    border-bottom: 1px solid #dee2e6;
   }
 }
-

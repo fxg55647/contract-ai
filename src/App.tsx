@@ -192,7 +192,7 @@ function App() {
         })
         .join("\n");
 
-      const prompt = `You are a legal drafting expert specialising in finance and commercial contracts. Based on the following contract structure graph, generate formal contract clause language.\n\nNodes:\n${nodeList}\n\nRelationships:\n${edgeList}\n\nGenerate clear, formal contract text as numbered legal clauses. Be precise and use standard legal drafting conventions.`;
+      const prompt = `You are a legal drafting expert specialising in finance and commercial contracts. Based on the following contract structure graph, generate formal contract clause language.\n\nNodes:\n${nodeList}\n\nRelationships:\n${edgeList}\n\nGenerate clear, formal contract text as numbered legal clauses. Be precise and use standard legal drafting conventions.\n\nReturn the output as clean HTML using only these tags: <h2>, <h3>, <p>, <ol>, <ul>, <li>, <strong>. No <html>, <head>, <body>, or inline styles.`;
 
       setGeneratedText(await callClaude(apiKey, [{ role: "user", content: prompt }]));
     } catch (err) {
@@ -240,7 +240,8 @@ function App() {
                   {isGenerating ? (
                     <p className="generated-text-empty">Calling Claude, please wait...</p>
                   ) : generatedText ? (
-                    <pre>{generatedText}</pre>
+                    // eslint-disable-next-line react/no-danger
+                    <div className="generated-text-content" dangerouslySetInnerHTML={{ __html: generatedText }} />
                   ) : (
                     <p className="generated-text-empty">
                       Enter your API key and click the button above to generate contract text from
