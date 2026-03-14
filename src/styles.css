@@ -262,13 +262,24 @@ body {
 .api-key-row {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
-.api-key-label {
+.api-key-toggle-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
   font-size: 0.8rem;
   font-weight: 600;
-  color: #333;
+  color: #158cba;
+  cursor: pointer;
+  text-align: left;
+  width: fit-content;
+}
+
+.api-key-toggle-link:hover {
+  text-decoration: underline;
 }
 
 .api-key-field {
@@ -321,19 +332,19 @@ body {
   padding: 9px 16px;
   border-radius: 6px;
   border: none;
-  background: #28b62c;
+  background: #158cba;
   color: #fff;
   font-family: inherit;
   font-weight: 700;
   font-size: 0.9rem;
   cursor: pointer;
   transition: background 120ms ease, transform 80ms ease, box-shadow 120ms ease;
-  box-shadow: 0 2px 6px rgba(40, 182, 44, 0.3);
+  box-shadow: 0 2px 6px rgba(21, 140, 186, 0.3);
 }
 
 .generate-button:hover:not(:disabled) {
-  background: #23a127;
-  box-shadow: 0 4px 10px rgba(40, 182, 44, 0.35);
+  background: #1279a3;
+  box-shadow: 0 4px 10px rgba(21, 140, 186, 0.35);
 }
 
 .generate-button:active:not(:disabled) {
