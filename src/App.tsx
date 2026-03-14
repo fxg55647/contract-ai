@@ -12,7 +12,7 @@ type RawEdge = { from: string; to: string };
 
 const NODE_WIDTH = 260;
 const X_GAP = NODE_WIDTH + 60;
-const Y_GAP = 160;
+const Y_GAP = 220;
 
 function autoLayout(entryId: string, rawNodes: RawNode[], edges: RawEdge[]): GraphNode[] {
   const levels = new Map<string, number>();

@@ -28,7 +28,7 @@ type GraphEditorProps = {
 };
 
 const NODE_WIDTH = 260;
-const CHILD_Y_OFFSET = 160;
+const CHILD_Y_OFFSET = 220;
 
 function DeletableEdge(props: EdgeProps) {
   const { setEdges } = useReactFlow();
@@ -128,12 +128,25 @@ function GraphEditorInner({ initialNodes, initialEdges, onGraphChange }: GraphEd
   const wrapperRef = useRef<HTMLDivElement>(null);
   const connectingNodeId = useRef<string | null>(null);
   const idCounterRef = useRef(0);
+  const nodesRef = useRef(nodes);
+  nodesRef.current = nodes;
+
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
   const [draftName, setDraftName] = useState("");
   const [draftDescription, setDraftDescription] = useState("");
 
+  // Stable wrappers — labels capture these once; they always delegate to handlersRef
+  const handlersRef = useRef({
+    delete: (_id: string) => {},
+    edit: (_id: string) => {},
+    addChild: (_id: string) => {},
+  });
+  const stableDelete = useCallback((id: string) => handlersRef.current.delete(id), []);
+  const stableEdit = useCallback((id: string) => handlersRef.current.edit(id), []);
+  const stableAddChild = useCallback((id: string) => handlersRef.current.addChild(id), []);
+
   function handleEditNode(nodeId: string) {
-    const node = nodes.find((n) => n.id === nodeId);
+    const node = nodesRef.current.find((n) => n.id === nodeId);
     const meta = node?.data?.meta as { name?: string; description?: string[] } | undefined;
     const init = initialNodes.find((n) => n.id === nodeId);
     setEditingNodeId(nodeId);
@@ -147,31 +160,36 @@ function GraphEditorInner({ initialNodes, initialEdges, onGraphChange }: GraphEd
   }
 
   function handleAddChild(sourceId: string) {
-    const source = nodes.find((n) => n.id === sourceId);
-    const sourcePos = source?.position ?? { x: 0, y: 0 };
-
     const newId = `new_${Date.now()}_${idCounterRef.current++}`;
     const newName = "New Step";
     const newDescription: string[] = [];
-    const newPosition = { x: sourcePos.x, y: sourcePos.y + CHILD_Y_OFFSET };
 
-    setNodes((ns) => [
-      ...ns,
-      {
-        id: newId,
-        position: newPosition,
-        data: {
-          meta: { name: newName, description: newDescription },
-          label: createNodeLabel(newId, newName, newDescription, handleDeleteNode, handleEditNode, handleAddChild),
+    setNodes((current) => {
+      const source = current.find((n) => n.id === sourceId);
+      const sourcePos = source?.position ?? { x: 0, y: 0 };
+      return [
+        ...current,
+        {
+          id: newId,
+          position: { x: sourcePos.x, y: sourcePos.y + CHILD_Y_OFFSET },
+          data: {
+            meta: { name: newName, description: newDescription },
+            label: createNodeLabel(newId, newName, newDescription, stableDelete, stableEdit, stableAddChild),
+          },
+          style: { width: NODE_WIDTH },
         },
-        style: { width: NODE_WIDTH },
-      },
-    ]);
+      ];
+    });
     setEdges((es) => [
       ...es,
       { id: `e_${sourceId}_${newId}`, source: sourceId, target: newId, type: "deletable" },
     ]);
   }
+
+  // Keep handlersRef current every render
+  handlersRef.current.delete = handleDeleteNode;
+  handlersRef.current.edit = handleEditNode;
+  handlersRef.current.addChild = handleAddChild;
 
   function handleSaveEdit() {
     if (!editingNodeId) return;
@@ -183,13 +201,12 @@ function GraphEditorInner({ initialNodes, initialEdges, onGraphChange }: GraphEd
     setNodes((current) =>
       current.map((node) => {
         if (node.id !== editingNodeId) return node;
-        const meta = { name, description };
         return {
           ...node,
           data: {
             ...node.data,
-            meta,
-            label: createNodeLabel(node.id, name, description, handleDeleteNode, handleEditNode, handleAddChild),
+            meta: { name, description },
+            label: createNodeLabel(node.id, name, description, stableDelete, stableEdit, stableAddChild),
           },
         };
       }),
@@ -239,7 +256,7 @@ function GraphEditorInner({ initialNodes, initialEdges, onGraphChange }: GraphEd
           position,
           data: {
             meta: { name: newName, description: newDescription },
-            label: createNodeLabel(newId, newName, newDescription, handleDeleteNode, handleEditNode, handleAddChild),
+            label: createNodeLabel(newId, newName, newDescription, stableDelete, stableEdit, stableAddChild),
           },
           style: { width: NODE_WIDTH },
         },
@@ -284,7 +301,7 @@ function GraphEditorInner({ initialNodes, initialEdges, onGraphChange }: GraphEd
           position: node.position,
           data: {
             meta: { name: node.name, description: desc },
-            label: createNodeLabel(node.id, node.name, desc, handleDeleteNode, handleEditNode, handleAddChild),
+            label: createNodeLabel(node.id, node.name, desc, stableDelete, stableEdit, stableAddChild),
           },
           style: { width: NODE_WIDTH },
         };

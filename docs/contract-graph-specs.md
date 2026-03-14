@@ -112,6 +112,10 @@ Plain textANTLR4BashCC#CSSCoffeeScriptCMakeDartDjangoDockerEJSErlangGitGoGraphQL
 Graph Layout Principles
 -----------------------
 
+### Node Spacing
+
+Nodes should be spaced generously so that the graph is easy to read. A good rule of thumb is to leave roughly one node's worth of vertical space between connected nodes. Cramped layouts make the graph harder to follow and should be avoided.
+
 ### Primary Flow Direction
 
 The graph should primarily flow from top to bottom. Users should be able to read the contract logic vertically.
