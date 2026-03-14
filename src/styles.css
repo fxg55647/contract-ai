@@ -541,6 +541,18 @@ body {
   background: #e2e2e2;
 }
 
+.graph-node-action-btn--add {
+  background: #d4f0d5;
+  border-color: #a9e2ab;
+  color: #28b62c;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.graph-node-action-btn--add:hover {
+  background: #a9e2ab;
+}
+
 .graph-node-action-btn--danger {
   background: #ffd9d7;
   border-color: #ffb3af;
@@ -549,6 +561,28 @@ body {
 
 .graph-node-action-btn--danger:hover {
   background: #ffb3af;
+}
+
+.edge-delete-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid #ffb3af;
+  background: #fff;
+  color: #ff4136;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  padding: 0;
+}
+
+.edge-delete-btn:hover {
+  background: #ffd9d7;
 }
 
 .graph-node-list {

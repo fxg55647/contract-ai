@@ -118,24 +118,24 @@ The graph should primarily flow from top to bottom. Users should be able to read
 
 Plain textANTLR4BashCC#CSSCoffeeScriptCMakeDartDjangoDockerEJSErlangGitGoGraphQLGroovyHTMLJavaJavaScriptJSONJSXKotlinLaTeXLessLuaMakefileMarkdownMATLABMarkupObjective-CPerlPHPPowerShell.propertiesProtocol BuffersPythonRRubySass (Sass)Sass (Scss)SchemeSQLShellSwiftSVGTSXTypeScriptWebAssemblyYAMLXML`   Start    ↓   Step    ↓  Decision  ↙       ↘  Outcome A   Outcome B   `
 
-Wide horizontal structures should be avoided whenever possible.
+The graph may spread horizontally when logically necessary, for example when a decision has multiple outcomes. The primary reading direction should remain top to bottom.
 
 ### Branching
 
-Branches should be limited and used only when logically necessary.
+Branches should reflect logical necessity. When a decision leads to multiple outcomes, each outcome should appear as a separate node connected by its own edge.
 
 Plain textANTLR4BashCC#CSSCoffeeScriptCMakeDartDjangoDockerEJSErlangGitGoGraphQLGroovyHTMLJavaJavaScriptJSONJSXKotlinLaTeXLessLuaMakefileMarkdownMATLABMarkupObjective-CPerlPHPPowerShell.propertiesProtocol BuffersPythonRRubySass (Sass)Sass (Scss)SchemeSQLShellSwiftSVGTSXTypeScriptWebAssemblyYAMLXML`   Leverage Test        ↓    Compliant   `
 
 Plain textANTLR4BashCC#CSSCoffeeScriptCMakeDartDjangoDockerEJSErlangGitGoGraphQLGroovyHTMLJavaJavaScriptJSONJSXKotlinLaTeXLessLuaMakefileMarkdownMATLABMarkupObjective-CPerlPHPPowerShell.propertiesProtocol BuffersPythonRRubySass (Sass)Sass (Scss)SchemeSQLShellSwiftSVGTSXTypeScriptWebAssemblyYAMLXML`   Leverage Test        ↓  Leverage Breach   `
-
-Large horizontal spreads of nodes should be avoided because they reduce readability.
 
 Graph Editing (User Interface Behavior)
 ---------------------------------------
 
 ### Node Actions
 
-Each node provides the following controls: **Edit** (modify the node name and description), **Delete** (remove the node), and **Create connection** (drag from the node to create a connection).
+Each node provides the following controls: **Add child** (create a new node directly connected below this one), **Edit** (modify the node name and description), **Delete** (remove the node), and **Create connection** (drag from the node to create a connection).
+
+The **Add child** button (+) is the primary way to extend the graph step by step. It creates a new node positioned below the source node and automatically connects them with an edge. The new node receives a temporary name that the user can then edit.
 
 ### Creating Connections
 
@@ -150,6 +150,10 @@ Plain textANTLR4BashCC#CSSCoffeeScriptCMakeDartDjangoDockerEJSErlangGitGoGraphQL
 Plain textANTLR4BashCC#CSSCoffeeScriptCMakeDartDjangoDockerEJSErlangGitGoGraphQLGroovyHTMLJavaJavaScriptJSONJSXKotlinLaTeXLessLuaMakefileMarkdownMATLABMarkupObjective-CPerlPHPPowerShell.propertiesProtocol BuffersPythonRRubySass (Sass)Sass (Scss)SchemeSQLShellSwiftSVGTSXTypeScriptWebAssemblyYAMLXML`   Node A → New Node   `
 
 The new node receives a temporary name such as New Step. The user can then edit the node.
+
+### Deleting Connections
+
+Clicking an edge selects it and reveals a delete button at the midpoint of the edge. Clicking the button removes the edge. This allows users to remove connections without deleting the nodes themselves.
 
 ### Connection Handles
 

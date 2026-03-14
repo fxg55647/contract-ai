@@ -13,6 +13,10 @@ import ReactFlow, {
   useReactFlow,
   OnConnectStart,
   OnConnectEnd,
+  EdgeProps,
+  EdgeLabelRenderer,
+  getBezierPath,
+  BaseEdge,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import type { GraphNode, GraphEdge } from "../types";
@@ -24,6 +28,41 @@ type GraphEditorProps = {
 };
 
 const NODE_WIDTH = 260;
+const CHILD_Y_OFFSET = 160;
+
+function DeletableEdge(props: EdgeProps) {
+  const { setEdges } = useReactFlow();
+  const { id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, selected } = props;
+  const [edgePath, labelX, labelY] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
+
+  return (
+    <>
+      <BaseEdge id={id} path={edgePath} />
+      {selected && (
+        <EdgeLabelRenderer>
+          <div
+            style={{
+              position: "absolute",
+              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+              pointerEvents: "all",
+            }}
+            className="nodrag nopan"
+          >
+            <button
+              type="button"
+              className="edge-delete-btn"
+              onClick={() => setEdges((es) => es.filter((e) => e.id !== id))}
+            >
+              ×
+            </button>
+          </div>
+        </EdgeLabelRenderer>
+      )}
+    </>
+  );
+}
+
+const edgeTypes = { deletable: DeletableEdge };
 
 function createNodeLabel(
   nodeId: string,
@@ -31,12 +70,21 @@ function createNodeLabel(
   description: string[],
   onDelete: (id: string) => void,
   onEdit: (id: string) => void,
+  onAddChild: (id: string) => void,
 ) {
   return (
     <div className="graph-node">
       <div className="graph-node-header">
         <div className="graph-node-title">{name}</div>
         <div className="graph-node-actions">
+          <button
+            type="button"
+            className="graph-node-action-btn graph-node-action-btn--add"
+            title="Add child node"
+            onClick={(e) => { e.stopPropagation(); onAddChild(nodeId); }}
+          >
+            +
+          </button>
           <button
             type="button"
             className="graph-node-action-btn"
@@ -69,6 +117,7 @@ function toReactFlowEdges(edges: GraphEdge[]): Edge[] {
     id: edge.id,
     source: edge.source,
     target: edge.target,
+    type: "deletable",
   }));
 }
 
@@ -92,6 +141,38 @@ function GraphEditorInner({ initialNodes, initialEdges, onGraphChange }: GraphEd
     setDraftDescription((meta?.description ?? init?.description ?? []).join("\n"));
   }
 
+  function handleDeleteNode(nodeId: string) {
+    setNodes((ns) => ns.filter((n) => n.id !== nodeId));
+    setEdges((es) => es.filter((e) => e.source !== nodeId && e.target !== nodeId));
+  }
+
+  function handleAddChild(sourceId: string) {
+    const source = nodes.find((n) => n.id === sourceId);
+    const sourcePos = source?.position ?? { x: 0, y: 0 };
+
+    const newId = `new_${Date.now()}_${idCounterRef.current++}`;
+    const newName = "New Step";
+    const newDescription: string[] = [];
+    const newPosition = { x: sourcePos.x, y: sourcePos.y + CHILD_Y_OFFSET };
+
+    setNodes((ns) => [
+      ...ns,
+      {
+        id: newId,
+        position: newPosition,
+        data: {
+          meta: { name: newName, description: newDescription },
+          label: createNodeLabel(newId, newName, newDescription, handleDeleteNode, handleEditNode, handleAddChild),
+        },
+        style: { width: NODE_WIDTH },
+      },
+    ]);
+    setEdges((es) => [
+      ...es,
+      { id: `e_${sourceId}_${newId}`, source: sourceId, target: newId, type: "deletable" },
+    ]);
+  }
+
   function handleSaveEdit() {
     if (!editingNodeId) return;
     const name = draftName.trim() || "Untitled";
@@ -108,7 +189,7 @@ function GraphEditorInner({ initialNodes, initialEdges, onGraphChange }: GraphEd
           data: {
             ...node.data,
             meta,
-            label: createNodeLabel(node.id, name, description, handleDeleteNode, handleEditNode),
+            label: createNodeLabel(node.id, name, description, handleDeleteNode, handleEditNode, handleAddChild),
           },
         };
       }),
@@ -120,14 +201,9 @@ function GraphEditorInner({ initialNodes, initialEdges, onGraphChange }: GraphEd
     setEditingNodeId(null);
   }
 
-  function handleDeleteNode(nodeId: string) {
-    setNodes((ns) => ns.filter((n) => n.id !== nodeId));
-    setEdges((es) => es.filter((e) => e.source !== nodeId && e.target !== nodeId));
-  }
-
   const onConnect = useCallback(
     (connection: Connection) => {
-      setEdges((eds) => addEdge(connection, eds));
+      setEdges((eds) => addEdge({ ...connection, type: "deletable" }, eds));
     },
     [setEdges],
   );
@@ -163,14 +239,14 @@ function GraphEditorInner({ initialNodes, initialEdges, onGraphChange }: GraphEd
           position,
           data: {
             meta: { name: newName, description: newDescription },
-            label: createNodeLabel(newId, newName, newDescription, handleDeleteNode, handleEditNode),
+            label: createNodeLabel(newId, newName, newDescription, handleDeleteNode, handleEditNode, handleAddChild),
           },
           style: { width: NODE_WIDTH },
         },
       ]);
       setEdges((es) => [
         ...es,
-        { id: `e_${sourceId}_${newId}`, source: sourceId, target: newId },
+        { id: `e_${sourceId}_${newId}`, source: sourceId, target: newId, type: "deletable" },
       ]);
     },
     [project, setNodes, setEdges],
@@ -208,7 +284,7 @@ function GraphEditorInner({ initialNodes, initialEdges, onGraphChange }: GraphEd
           position: node.position,
           data: {
             meta: { name: node.name, description: desc },
-            label: createNodeLabel(node.id, node.name, desc, handleDeleteNode, handleEditNode),
+            label: createNodeLabel(node.id, node.name, desc, handleDeleteNode, handleEditNode, handleAddChild),
           },
           style: { width: NODE_WIDTH },
         };
@@ -222,7 +298,7 @@ function GraphEditorInner({ initialNodes, initialEdges, onGraphChange }: GraphEd
         <div className="graph-header-text">
           <h2>Graph</h2>
           <p className="graph-caption">
-            Drag from a node handle to connect or create a new step.
+            Drag from a node handle to connect or create a new step. Click an edge to delete it.
           </p>
         </div>
       </div>
@@ -271,6 +347,7 @@ function GraphEditorInner({ initialNodes, initialEdges, onGraphChange }: GraphEd
         <ReactFlow
           nodes={nodes}
           edges={edges}
+          edgeTypes={edgeTypes}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
