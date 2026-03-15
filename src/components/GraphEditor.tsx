@@ -33,8 +33,16 @@ const CHILD_Y_OFFSET = 220;
 
 function DeletableEdge(props: EdgeProps) {
   const { setEdges } = useReactFlow();
-  const { id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, selected } = props;
-  const [edgePath, labelX, labelY] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
+  const { id, sourceX, sourceY, targetX, targetY, selected } = props;
+  const goingDown = targetY >= sourceY;
+  const [edgePath, labelX, labelY] = getBezierPath({
+    sourceX,
+    sourceY,
+    sourcePosition: goingDown ? Position.Bottom : Position.Top,
+    targetX,
+    targetY,
+    targetPosition: goingDown ? Position.Top : Position.Bottom,
+  });
 
   return (
     <>
