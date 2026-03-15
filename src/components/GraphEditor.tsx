@@ -138,6 +138,7 @@ function GraphEditorInner({ initialNodes, initialEdges, onGraphChange }: GraphEd
   const { project } = useReactFlow();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const connectingNodeId = useRef<string | null>(null);
+  const didConnectRef = useRef(false);
   const idCounterRef = useRef(0);
   const nodesRef = useRef(nodes);
   nodesRef.current = nodes;
@@ -187,8 +188,6 @@ function GraphEditorInner({ initialNodes, initialEdges, onGraphChange }: GraphEd
             meta: { name: newName, description: newDescription },
             label: createNodeLabel(newId, newName, newDescription, stableDelete, stableEdit, stableAddChild),
           },
-          sourcePosition: Position.Bottom,
-          targetPosition: Position.Top,
           style: { width: NODE_WIDTH },
         },
       ];
@@ -233,6 +232,7 @@ function GraphEditorInner({ initialNodes, initialEdges, onGraphChange }: GraphEd
 
   const onConnect = useCallback(
     (connection: Connection) => {
+      didConnectRef.current = true;
       setEdges((eds) => addEdge({ ...connection, type: "deletable", markerEnd: { type: MarkerType.ArrowClosed } }, eds));
     },
     [setEdges],
@@ -247,6 +247,7 @@ function GraphEditorInner({ initialNodes, initialEdges, onGraphChange }: GraphEd
       const sourceId = connectingNodeId.current;
       connectingNodeId.current = null;
       if (!sourceId) return;
+      if (didConnectRef.current) { didConnectRef.current = false; return; }
 
       const mouseEvent = event as MouseEvent;
       const target = mouseEvent.target as Element;
@@ -271,8 +272,6 @@ function GraphEditorInner({ initialNodes, initialEdges, onGraphChange }: GraphEd
             meta: { name: newName, description: newDescription },
             label: createNodeLabel(newId, newName, newDescription, stableDelete, stableEdit, stableAddChild),
           },
-          sourcePosition: Position.Bottom,
-          targetPosition: Position.Top,
           style: { width: NODE_WIDTH },
         },
       ]);
@@ -318,8 +317,6 @@ function GraphEditorInner({ initialNodes, initialEdges, onGraphChange }: GraphEd
             meta: { name: node.name, description: desc },
             label: createNodeLabel(node.id, node.name, desc, stableDelete, stableEdit, stableAddChild),
           },
-          sourcePosition: Position.Bottom,
-          targetPosition: Position.Top,
           style: { width: NODE_WIDTH },
         };
       }),
