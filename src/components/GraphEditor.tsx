@@ -34,7 +34,7 @@ const CHILD_Y_OFFSET = 220;
 
 function DeletableEdge(props: EdgeProps) {
   const { setEdges } = useReactFlow();
-  const { id, sourceX, sourceY, targetX, targetY, selected } = props;
+  const { id, sourceX, sourceY, targetX, targetY, selected, markerEnd } = props;
   const goingDown = targetY >= sourceY;
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
@@ -47,7 +47,7 @@ function DeletableEdge(props: EdgeProps) {
 
   return (
     <>
-      <BaseEdge id={id} path={edgePath} markerEnd={`url(#${MarkerType.ArrowClosed})`} />
+      <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} />
       {selected && (
         <EdgeLabelRenderer>
           <div
@@ -128,6 +128,7 @@ function toReactFlowEdges(edges: GraphEdge[]): Edge[] {
     source: edge.source,
     target: edge.target,
     type: "deletable",
+    markerEnd: { type: MarkerType.ArrowClosed },
   }));
 }
 
@@ -232,7 +233,7 @@ function GraphEditorInner({ initialNodes, initialEdges, onGraphChange }: GraphEd
 
   const onConnect = useCallback(
     (connection: Connection) => {
-      setEdges((eds) => addEdge({ ...connection, type: "deletable" }, eds));
+      setEdges((eds) => addEdge({ ...connection, type: "deletable", markerEnd: { type: MarkerType.ArrowClosed } }, eds));
     },
     [setEdges],
   );
