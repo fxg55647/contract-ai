@@ -17,6 +17,7 @@ import ReactFlow, {
   EdgeLabelRenderer,
   getBezierPath,
   BaseEdge,
+  MarkerType,
   Position,
 } from "reactflow";
 import "reactflow/dist/style.css";
@@ -46,7 +47,7 @@ function DeletableEdge(props: EdgeProps) {
 
   return (
     <>
-      <BaseEdge id={id} path={edgePath} />
+      <BaseEdge id={id} path={edgePath} markerEnd={`url(#${MarkerType.ArrowClosed})`} />
       {selected && (
         <EdgeLabelRenderer>
           <div
