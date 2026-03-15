@@ -595,7 +595,7 @@ body {
 
 /* ReactFlow handle visibility */
 .react-flow__handle {
-  opacity: 0;
+  opacity: 0.25;
   transition: opacity 150ms ease;
 }
 

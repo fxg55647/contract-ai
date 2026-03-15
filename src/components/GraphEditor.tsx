@@ -195,7 +195,7 @@ function GraphEditorInner({ initialNodes, initialEdges, onGraphChange }: GraphEd
     });
     setEdges((es) => [
       ...es,
-      { id: `e_${sourceId}_${newId}`, source: sourceId, target: newId, type: "deletable" },
+      { id: `e_${sourceId}_${newId}`, source: sourceId, target: newId, type: "deletable", markerEnd: { type: MarkerType.ArrowClosed } },
     ]);
   }
 
@@ -278,7 +278,7 @@ function GraphEditorInner({ initialNodes, initialEdges, onGraphChange }: GraphEd
       ]);
       setEdges((es) => [
         ...es,
-        { id: `e_${sourceId}_${newId}`, source: sourceId, target: newId, type: "deletable" },
+        { id: `e_${sourceId}_${newId}`, source: sourceId, target: newId, type: "deletable", markerEnd: { type: MarkerType.ArrowClosed } },
       ]);
     },
     [project, setNodes, setEdges],
