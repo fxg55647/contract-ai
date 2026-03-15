@@ -75,7 +75,7 @@ async function callClaude(apiKey: string, messages: { role: string; content: str
       "anthropic-version": "2023-06-01",
       "anthropic-dangerous-direct-browser-access": "true",
     },
-    body: JSON.stringify({ model: MODEL, max_tokens: 2048, messages }),
+    body: JSON.stringify({ model: MODEL, max_tokens: 4096, messages }),
   });
   if (!response.ok) {
     const err = (await response.json().catch(() => ({}))) as { error?: { message?: string } };
