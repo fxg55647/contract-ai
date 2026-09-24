@@ -31,7 +31,7 @@ export function createApp(store: WorkspaceStore) {
   app.post('/api/selection', (req, res) => { store.select(z.object({ id: nodeIdSchema.nullable() }).parse(req.body).id); res.json(snapshot()); });
   app.post('/api/undo', (req, res) => { store.undo(revisionSchema.parse(req.body).expectedRevision); res.json(snapshot()); });
   app.post('/api/redo', (req, res) => { store.undo(revisionSchema.parse(req.body).expectedRevision, true); res.json(snapshot()); });
-  app.post('/api/import', (req, res) => { store.restore(req.body.model, revisionSchema.parse(req.body).expectedRevision, 'editor'); res.json(snapshot()); });
+  app.post('/api/model', (req, res) => { store.replaceModel(req.body.model, revisionSchema.parse(req.body).expectedRevision, 'editor'); res.json(snapshot()); });
   app.post('/api/sources', (req, res) => {
     const input = z.object({ title: z.string().trim().min(1).max(200), content: z.string().min(1).max(60000) }).strict().parse(req.body);
     if (!input.content.trim()) throw new ModelError('Lähdeteksti on tyhjä.');
@@ -46,8 +46,22 @@ export function createApp(store: WorkspaceStore) {
     const limit = z.coerce.number().int().min(1).max(30).parse(req.query.limit ?? 10);
     res.json({ documentId: document.id, fragments: document.fragments.slice(offset, offset + limit), total: document.fragments.length, nextOffset: offset + limit < document.fragments.length ? offset + limit : null });
   });
-  app.get('/api/package', (_req, res) => res.json(store.exportPackage()));
-  app.post('/api/package', (req, res) => res.json(store.importPackage(req.body.package, revisionSchema.parse(req.body).expectedRevision)));
+  app.post(
+    '/api/document/open',
+    express.raw({ type: ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/octet-stream'], limit: '20mb' }),
+    async (req, res) => {
+      const revision = z.coerce.number().int().nonnegative().parse(req.query.expectedRevision);
+      const fileName = z.string().min(1).max(500).parse(req.headers['x-document-name'] ?? 'sopimus.docx');
+      if (!Buffer.isBuffer(req.body)) throw new ModelError('DOCX-tiedostoa ei vastaanotettu.');
+      res.json(await store.openDocumentBuffer(req.body, decodeURIComponent(fileName), revision));
+    },
+  );
+  app.post('/api/document/save', async (_req, res) => {
+    const { buffer, fileName } = await store.saveDocument();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+    res.send(buffer);
+  });
   app.post('/api/draft', (req, res) => {
     const input = z.object({ text: z.string().min(1).max(120000), expectedRevision: z.number().int().nonnegative() }).strict().parse(req.body);
     store.setDraft(input.text, input.expectedRevision);

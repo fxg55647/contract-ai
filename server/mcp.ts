@@ -3,7 +3,6 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { patchSchema, nodeIdSchema } from "../shared/model";
 import { SYSTEM_PROMPT } from "../shared/prompts";
-import { packageSchema } from "../shared/package";
 import { sourceDocumentIdSchema } from "../shared/sources";
 
 const base = process.env.CONTRACT_SERVER_URL || "http://127.0.0.1:4317";
@@ -12,7 +11,7 @@ const server = new McpServer(
   {
     instructions:
       SYSTEM_PROMPT.replaceAll("submit_graph_changes", "apply_changes") +
-      "\nWhen asked to visualize a document: import its complete verbatim text using import_source_document, then read every page from read_source_fragments until nextOffset is null. Never assume a ChatGPT attachment is automatically available to this server. Do not summarize text during import; report incomplete extraction. Identify definitions, exceptions and cross-references before modeling. One fragment may support multiple nodes; one node may cite multiple fragments. Preserve all supported sourceRefs. Check every fragment for coverage and report unmodeled or uncertain parts; a valid reference alone does not prove the interpretation. Use save_draft to display requested drafts in the workspace. Use export_model and import_model for portable model packages, only replacing the graph when the user asks. These tools do not call another AI provider." +
+      "\nWhen asked to visualize a document: import its complete verbatim text using import_source_document, then read every page from read_source_fragments until nextOffset is null. Never assume a ChatGPT attachment is automatically available to this server. Do not summarize text during import; report incomplete extraction. Identify definitions, exceptions and cross-references before modeling. One fragment may support multiple nodes; one node may cite multiple fragments. Preserve all supported sourceRefs. Check every fragment for coverage and report unmodeled or uncertain parts; a valid reference alone does not prove the interpretation. Use save_draft to display requested drafts in the workspace. These tools do not call another AI provider." +
       "\nRead get_workspace before editing. Use apply_changes with its revision as expectedRevision. The browser updates live. Never replace existing nodes merely to regenerate a graph. The workspace is local and shared with the person using the editor.",
   },
 );
@@ -122,14 +121,6 @@ server.registerTool("read_source_fragments", {
   annotations: { readOnlyHint: true },
   inputSchema: { documentId: sourceDocumentIdSchema, offset: z.number().int().min(0).default(0), limit: z.number().int().min(1).max(30).default(10) },
 }, args => result(`/api/sources/${args.documentId}/fragments?offset=${args.offset}&limit=${args.limit}`));
-server.registerTool("export_model", {
-  description: "Return a portable JSON package with the graph and original source texts. It contains confidential source content; save it as a file with the client's file tools. No credentials or conversation included.",
-  annotations: { readOnlyHint: true }, inputSchema: {},
-}, () => result("/api/package"));
-server.registerTool("import_model", {
-  description: "Replace the current graph from an exported package, preserving exact sources and remapping source IDs. Read current revision first. Only on explicit user request. Graph replacement can be undone; imported read-only sources remain.",
-  inputSchema: { package: packageSchema, expectedRevision: z.number().int().nonnegative() },
-}, args => result("/api/package", args));
 server.registerTool("save_draft", {
   description: "Save a requested contract draft based on the current model revision for display and download in the browser. Keep unresolved terms explicit.",
   inputSchema: { text: z.string().min(1).max(120000), expectedRevision: z.number().int().nonnegative() },

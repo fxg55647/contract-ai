@@ -30,7 +30,7 @@ test("numbered clauses become separate excerpts even without blank lines", () =>
   assert.deepEqual(fragments.map((fragment) => fragment.heading), ["7.2 Toimitus", "7.3 Viivästys"]);
 });
 
-test("workspace keeps immutable sources and rejects invented references", () => {
+test("workspace keeps immutable sources and rejects invented references", async () => {
   const store = new WorkspaceStore();
   const message = store.message("user", "7.2 Toimitus\nToimitus tehdään 14 päivässä.");
   const document = store.addSourceDocument(message.content, message.id);
@@ -43,12 +43,15 @@ test("workspace keeps immutable sources and rejects invented references", () => 
   assert.equal(store.snapshot().model.nodes[0].sourceRefs[0].fragmentId, "D1-F1");
   assert.throws(() => store.apply({ expectedRevision: 1, summary: "Keksitty lainaus", operations: [{ type: "update_node", id: "N1", changes: { sourceRefs: [{ documentId: "D1", fragmentId: "D1-F1", quote: "Toimitus tehdään 30 päivässä." }] } }] }, "test"), /sanatarkka/);
   store.apply({ expectedRevision: 1, summary: "Tarkka lainaus", operations: [{ type: "update_node", id: "N1", changes: { sourceRefs: [{ documentId: "D1", fragmentId: "D1-F1", quote: "Toimitus tehdään 14 päivässä." }] } }] }, "test");
+  store.apply({ expectedRevision: 2, summary: "Siirto", operations: [{ type: "update_node", id: "N1", changes: { position: { x: 20, y: 30 } } }] }, "test");
+  assert.equal(store.snapshot().model.nodes[0].sourceRefs[0].quote, "Toimitus tehdään 14 päivässä.");
   const imported = new WorkspaceStore();
-  imported.importPackage(store.exportPackage(), 0);
+  const documentFile = await store.saveDocument();
+  await imported.openDocumentBuffer(documentFile.buffer, documentFile.fileName, 0);
   assert.equal(imported.snapshot().model.nodes[0].sourceRefs[0].quote, "Toimitus tehdään 14 päivässä.");
 
   assert.throws(() => store.apply({
-    expectedRevision: 2,
+    expectedRevision: 3,
     summary: "Virheellinen viite",
     operations: [{ type: "update_node", id: "N1", changes: { sourceRefs: [{ documentId: "D1", fragmentId: "D1-F99" }] } }],
   }, "test"), /puuttuvaan lähdekatkelmaan/);

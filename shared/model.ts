@@ -14,7 +14,7 @@ export const nodeSchema = z
     title: text.max(100),
     text: z.string().max(10_000),
     open: z.boolean(),
-    sourceRefs: z.array(sourceReferenceSchema).max(32).default([]),
+    sourceRefs: z.array(sourceReferenceSchema).max(32),
     position: positionSchema,
   })
   .strict();
@@ -32,33 +32,7 @@ export const modelSchema = z
     nextNodeNumber: z.number().int().positive().max(999999),
     title: text.max(160),
     entry: nodeIdSchema.nullable(),
-    nodes: z.array(z.preprocess((input) => {
-      if (input && typeof input === "object" && !Array.isArray(input)) {
-        const { kind: _legacyKind, ...node } = input as Record<string, unknown>;
-        if (!("title" in node) || !("text" in node) || !("open" in node)) {
-          const actor = typeof node.actor === "string" ? node.actor.trim() : "";
-          const summary = typeof node.summary === "string" ? node.summary.trim() : "";
-          const details = typeof node.details === "string" ? node.details.trim() : "";
-          const question = typeof node.question === "string" ? node.question.trim() : "";
-          const paragraphs = [
-            actor ? `Vastuullinen osapuoli: ${actor}` : "",
-            summary,
-            details && details !== summary ? details : "",
-            question ? `Avoin kysymys: ${question}` : "",
-          ].filter(Boolean);
-          return {
-            id: node.id,
-            title: node.name,
-            text: paragraphs.join("\n\n"),
-            open: node.status === "open" || Boolean(question),
-            sourceRefs: node.sourceRefs ?? [],
-            position: node.position,
-          };
-        }
-        return node;
-      }
-      return input;
-    }, nodeSchema)).max(200),
+    nodes: z.array(nodeSchema).max(200),
     edges: z.array(edgeSchema).max(500),
   })
   .strict();
@@ -132,6 +106,7 @@ export type Workspace = {
   canUndo: boolean;
   canRedo: boolean;
   aiConfigured: boolean;
+  document: import("./document").DocumentStatus;
 };
 export class ModelError extends Error {
   constructor(

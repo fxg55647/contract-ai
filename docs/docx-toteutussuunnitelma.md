@@ -1,6 +1,9 @@
 # Diagrammit DOCX-dokumentin mukana
 
-Päiväys: 24.9.2026. Tämä on toteutussuunnitelma; DOCX-tallennusta ei ole vielä toteutettu.
+Päiväys: 24.9.2026. Toteutuksen tila: sovelluksen DOCX-luku ja -tallennus,
+selainkäyttöliittymä, tiukka nykyformaatti sekä automaattiset testit on tehty.
+Oikeiden Word- ja LibreOffice-versioiden käsin tehtävä tallennuskierros jää
+julkaisutarkistukseksi, koska kumpaakaan ohjelmaa ei ole tässä ympäristössä.
 
 ## Tavoite ja rajaus
 
@@ -18,7 +21,7 @@ Vanhoja tiedostomuotoja tai työtiloja ei tarvitse tukea eikä migroida.
 
 ## 1. Varmista säilyminen ennen lopullisen formaatin valintaa
 
-Ensisijainen kokeiltava ratkaisu on DOCX:n oma Custom XML Part: sovelluksen
+Toteutettu ratkaisu on DOCX:n oma Custom XML Part: sovelluksen
 omassa XML-nimiavaruudessa oleva versioitu tietosisältö, jonka sisällä
 diagrammidata voidaan esittää XML-tekstiksi escapettuna JSONina. Paketille
 luodaan asianmukaiset sisältötyypit ja relaatiot. Pelkkää irrallista JSON-entryä
@@ -71,7 +74,7 @@ eikä alkuperäisiä lähdekatkelmia. Tekstisisällön muutoksesta näytetään
 "Dokumentin teksti on muuttunut – tarkista diagrammi ja lähdeviitteet".
 Pelkkä ZIP- tai muotoilumuutos ei saa laukaista tekstimuutosilmoitusta.
 
-## 3. Toteuta palvelin ja käyttöliittymä
+## 3. Palvelin ja käyttöliittymä
 
 - Lisää `server/docx.ts`: paketin luku, validointi, dataosan haku nimiavaruudella,
   uuden dokumentin luonti ja olemassa olevan paketin rajattu päivitys.

@@ -10,8 +10,8 @@ import {
 } from "../shared/model";
 import { exampleModel } from "../shared/example";
 
-function download(name: string, content: string, type: string) {
-  const url = URL.createObjectURL(new Blob([content], { type }));
+function downloadBlob(name: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
   link.download = name;
@@ -33,10 +33,8 @@ export default function App() {
     label: string;
     revision: number;
   } | null>(null);
-  const importInput = useRef<HTMLInputElement>(null);
+  const documentInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    // The previous prototype persisted credentials; the new UI never retains them.
-    localStorage.removeItem("claude-api-key");
     const events = new EventSource("/api/events");
     events.onmessage = (event) => {
       setState(JSON.parse(event.data));
@@ -102,11 +100,50 @@ export default function App() {
     ...(state.lastChange?.added ?? []),
     ...(state.lastChange?.updated ?? []),
   ];
-  async function importModel(value: unknown) {
-    if (
-      await action(value && typeof value === "object" && "format" in value ? "package" : "import", value && typeof value === "object" && "format" in value ? { package: value, expectedRevision: model.revision } : { model: value, expectedRevision: model.revision })
-    )
-      setFitToken((v) => v + 1);
+  async function loadExample() {
+    if (await action("model", { model: exampleModel(), expectedRevision: model.revision }))
+      setFitToken((value) => value + 1);
+  }
+  async function openDocument(file: File) {
+    setError("");
+    setWriting(true);
+    try {
+      const response = await fetch(`/api/document/open?expectedRevision=${model.revision}`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "x-document-name": encodeURIComponent(file.name),
+        },
+        body: file,
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.error || `Pyyntö epäonnistui (${response.status})`);
+      }
+      setFitToken((value) => value + 1);
+      setPanel(null);
+      setEdgeEdit(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setWriting(false);
+    }
+  }
+  async function saveDocument() {
+    setError("");
+    setWriting(true);
+    try {
+      const response = await fetch("/api/document/save", { method: "POST" });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.error || `Pyyntö epäonnistui (${response.status})`);
+      }
+      downloadBlob(state?.document.fileName ?? "sopimus.docx", await response.blob());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setWriting(false);
+    }
   }
   function showPanel(next: typeof panel) {
     setPanel(panel === next ? null : next);
@@ -128,7 +165,7 @@ export default function App() {
         <div className="workspace-status">
           <span className={`connection-dot ${connected ? "online" : ""}`} />
           {connected
-            ? "Tallennettu paikallisesti"
+            ? `${state.document.fileName}${state.document.dirty ? " · tallentamattomia muutoksia" : " · tallennettu"}`
             : "Yhteys katkennut — yhdistetään uudelleen"}
           <span className="version">v{model.revision}</span>
         </div>
@@ -139,36 +176,24 @@ export default function App() {
                   Tekstiluonnos ↗
                 </button>
                 <button
-                  onClick={() =>
-                    download(
-                      "sopimusrakenne.json",
-                      JSON.stringify({ format: "contract-map", formatVersion: 1, model, sourceDocuments: state.sourceDocuments }, null, 2),
-                      "application/json",
-                    )
-                  }
-                >
-                  Vie JSON
-                </button>
-                <button
                   disabled={!editable}
-                  onClick={() => importInput.current?.click()}
+                  onClick={() => documentInput.current?.click()}
                 >
-                  Tuo JSON
+                  Avaa dokumentti
+                </button>
+                <button disabled={!editable} onClick={() => void saveDocument()}>
+                  Tallenna dokumentti
                 </button>
                 <input
-                  ref={importInput}
+                  ref={documentInput}
                   type="file"
-                  accept=".json,application/json"
+                  accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   className="sr-only"
-                  aria-label="Tuo sopimusrakenne"
+                  aria-label="Avaa Word-dokumentti"
                   onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
-                    try {
-                      await importModel(JSON.parse(await file.text()));
-                    } catch {
-                      setError("Tiedosto ei ole kelvollista JSONia.");
-                    }
+                    await openDocument(file);
                     e.target.value = "";
                   }}
                 />
@@ -192,6 +217,11 @@ export default function App() {
           <button aria-label="Sulje virheilmoitus" onClick={() => setError("")}>
             ×
           </button>
+        </div>
+      )}
+      {state.document.textChanged && (
+        <div className="notice document-notice" role="status">
+          Dokumentin tekstiä on muutettu Wordissa tai LibreOfficessa. Tarkista diagrammi ja lähdeviitteet.
         </div>
       )}
       <div className="workspace">
@@ -245,7 +275,7 @@ export default function App() {
                   <button
                     disabled={!editable}
                     className="primary"
-                    onClick={() => void importModel(exampleModel())}
+                    onClick={() => void loadExample()}
                   >
                     Tutustu esimerkillä
                   </button>
@@ -431,11 +461,7 @@ export default function App() {
                       <div className="draft-text">{state.draft.text}</div>
                       <button
                         onClick={() =>
-                          download(
-                            "sopimusluonnos.txt",
-                            state.draft!.text,
-                            "text/plain;charset=utf-8",
-                          )
+                          downloadBlob("sopimusluonnos.txt", new Blob([state.draft!.text], { type: "text/plain;charset=utf-8" }))
                         }
                       >
                         Lataa teksti

@@ -350,14 +350,20 @@ function Canvas(props: Props) {
           dragRevision.current = model.revision;
         }}
         onNodeDragStop={async (_, _node, dragged) => {
+          const operations = dragged.flatMap((n) => {
+            const position = movedPosition(n.id, n.position);
+            const previous = model.nodes.find((candidate) => candidate.id === n.id)!.position;
+            return Math.abs(position.x - previous.x) < 0.01 && Math.abs(position.y - previous.y) < 0.01
+              ? []
+              : [{
+                  type: "update_node" as const,
+                  id: n.id,
+                  changes: { position },
+                }];
+          });
+          if (!operations.length) return;
           const ok = await onChange(
-            dragged.map((n) => ({
-              type: "update_node",
-              id: n.id,
-              changes: {
-                position: movedPosition(n.id, n.position),
-              },
-            })),
+            operations,
             "Vaiheiden sijaintia muutettu",
             dragRevision.current,
           );

@@ -75,7 +75,7 @@ test("targeted edits preserve identity and human layout", () => {
 });
 test("deletion cleans up edges and undo restores them without reusing IDs", () => {
   const store = new WorkspaceStore();
-  store.restore(exampleModel(), 0, "test");
+  store.replaceModel(exampleModel(), 0, "test");
   apply(store, [{ type: "delete_node", id: "N3" }]);
   assert.ok(
     !store
@@ -160,7 +160,7 @@ test("workspace survives restart with selection, conversation and undo history",
   try {
     const file = join(dir, "workspace.json");
     const store = new WorkspaceStore(file);
-    store.restore(exampleModel(), 0, "test");
+    store.replaceModel(exampleModel(), 0, "test");
     store.message("user", "Täsmennetään korjausaikaa.");
     store.select("N4");
     store.setDraft("Luonnos", 1);
@@ -173,7 +173,7 @@ test("workspace survives restart with selection, conversation and undo history",
     rmSync(dir, { recursive: true, force: true });
   }
 });
-test("legacy node fields are combined and branches are inferred from edges", () => {
+test("legacy node fields are rejected", () => {
   const current = exampleModel();
   const legacy = {
     ...current,
@@ -189,14 +189,5 @@ test("legacy node fields are combined and branches are inferred from edges", () 
       question: open ? "Mikä on vielä avoinna?" : "",
     })),
   };
-  const migrated = validateModel(legacy);
-  assert.ok(migrated.nodes.every(node => !("kind" in node) && !("name" in node)));
-  assert.match(migrated.nodes[0].text, /Vastuullinen osapuoli: Toimittaja/);
-  assert.equal(migrated.nodes[0].open, true);
-  const terminal = { ...migrated, edges: [] };
-  assert.ok(!modelWarnings(terminal).some(w => w.text.includes("vaihtoehdot") || w.text.includes("lopputulos")));
-  assert.throws(() => applyPatch(migrated, {
-    expectedRevision: migrated.revision, summary: "Invalid obsolete type",
-    operations: [{ type: "update_node", id: migrated.nodes[0].id, changes: { kind: "action" } }]
-  }));
+  assert.throws(() => validateModel(legacy));
 });

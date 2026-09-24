@@ -14,13 +14,10 @@ reaaliaikainen selainpäivitys. Graafin käsimuutokset kulkevat samaa reittiä.
 - `shared/prompts.ts`: yhteinen mallinnusohje keskustelulle ja MCP-asiakkaalle.
 - `server/store.ts`: työtila, versionumerot, levyltä palautuminen, 50 muutoksen
   kumous-/palautuspino ja 100 viimeisen muutoksen yhteenveto.
-- `server/http.ts`: paikallinen API ja selainpäivitykset Server-Sent Eventsillä.
+- `server/http.ts`: paikallinen API, DOCX-reitit ja selainpäivitykset Server-Sent Eventsillä.
+- `server/docx.ts`: DOCX-paketin turvallinen luku ja diagrammidatan Custom XML Part.
 - `server/mcp.ts`: standardi stdio MCP-palvelin, joka käyttää samaa HTTP-APIa.
-- `server/ai.ts`: vapaa keskustelu, eksplisiittinen graafipyyntö työkaluskeemalla
-  ja erillinen tekstiluonnos. API-avain ei tallennu työtilaan.
-- `src/components/ConversationPanel.tsx`, `ContractCanvas.tsx` ja `Inspector.tsx`:
-  nykyinen käyttöliittymä. Samanaikaisen muokkauksen tuottamat vaihtoehtoiset
-  `ChatPanel.tsx`- ja `GraphEditor.tsx`-tiedostot on säilytetty; App ei käytä niitä.
+- `ContractCanvas.tsx` ja `Inspector.tsx`: nykyinen käyttöliittymä.
 
 ## Sopimusmallin merkitys
 
@@ -57,16 +54,13 @@ takaa sisällön oikeellisuutta; juristi ja osapuolet tarkastavat luonnoksen.
 
 - Yksi paikallinen työtila; ei käyttäjätunnuksia tai monen organisaation palvelua.
 - Esitysnäkymän voi jakaa tavallisella kokoustyökalulla. Ei julkista jakolinkkiä.
-- Yleiskuva näyttää vaiheet vaakasuunnassa ja tiivistää niiden tiedot. Näkymän
-  koordinaatit muunnetaan takaisin malliin siirrettäessä; tallennettu rakenne
-  tai käsin tehty asettelu ei muutu pelkän näkymänvaihdon vuoksi.
-- Polun läpikäynti korostaa käyttäjän valitsemat haarat. Ei laskentamoottoria,
-  automaattista oikeudellista simulointia tai luonnollisen kielen ehtojen suorittamista.
-- JSON-vienti sisältää sopimusmallin, ei keskustelua, API-avaimia tai kumouspinoa.
+- DOCX sisältää sopimusmallin, lähdetekstit ja tekstiluonnoksen omassa dataosassa.
+  Keskustelu, API-avaimet, valinta ja kumouspino eivät kulje dokumentin mukana.
+- Sovellus ei ole laskentamoottori eikä suorita luonnollisen kielen ehtoja.
 - Tekstiluonnos näyttää lähdeversion ja ilmoittaa, jos malli on muuttunut sen jälkeen.
 - MCP-asiakas liitetään erikseen. Ulkoisen asiakkaan oma keskustelu ei automaattisesti
   kopioidu sovelluksen chatiin; sen mallimuutokset näkyvät muutoshistoriassa.
-- Keskustelu ja työtila tallentuvat paikalliseen JSON-tiedostoon ilman salausta.
+- Aktiivinen työtila ja DOCX:n palautuskopio tallentuvat paikalliseen tiedostoon ilman salausta.
 
 ## Testauksen painopiste
 

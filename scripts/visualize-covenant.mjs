@@ -8,7 +8,9 @@ async function api(path, body) {
 }
 const before = await api('/api/state');
 mkdirSync('.contract-data/backups', { recursive: true });
-writeFileSync(`.contract-data/backups/before-covenant-${Date.now()}.json`, JSON.stringify(await api('/api/package'), null, 2));
+const backup = await fetch(base + '/api/document/save', { method: 'POST' });
+if (!backup.ok) throw new Error('DOCX backup failed');
+writeFileSync(`.contract-data/backups/before-covenant-${Date.now()}.docx`, Buffer.from(await backup.arrayBuffer()));
 const content = 'COV NetDebt/EBITDA(th=3.50, test=6mo, consec=2, waiver=written/reset, cert=req);\nIF breach×2&&!waiver => EoD; remedies=[cure≤30d, margin+≤2.00pp, accelerate];\nELSE IF breach => Watchlist; ELSE Compliant.';
 const source = await api('/api/sources', { title: 'NetDebt / EBITDA covenant', content });
 const excerpts = await api(`/api/sources/${source.documentId}/fragments?limit=30`);
@@ -16,9 +18,9 @@ if (excerpts.nextOffset !== null) throw new Error('Source reading incomplete');
 const refs = excerpts.fragments.map(f => ({ documentId: source.documentId, fragmentId: f.id }));
 let next = before.model.nextNodeNumber;
 const nodes = [];
-function node(name, summary, x, y, details = '', question = '') {
+function node(title, summary, x, y, details = '', question = '') {
   const id = `N${next++}`;
-  nodes.push({ id, name, summary, details, question, status: question ? 'open' : 'proposed', actor: '', source: 'Käyttäjän kovenanttilyhennelmä', sourceRefs: refs, position: { x, y } });
+  nodes.push({ id, title, text: [summary, details, question ? `Avoin kysymys: ${question}` : ''].filter(Boolean).join('\n\n'), open: Boolean(question), sourceRefs: refs, position: { x, y } });
   return id;
 }
 const start = node('Testi 6 kuukauden välein', 'NetDebt / EBITDA: raja 3,50. Kovenanttitodistus vaaditaan.', 400, 0, 'Lähde: test=6mo; cert=req. Todistuksen toimittajaa, määräaikaa ja puuttumisen seurausta ei määritetä.');
@@ -32,7 +34,7 @@ const eod = node('Ei waiveria → EoD', 'Kaksi peräkkäistä rikkomusta ilman w
 const remedies = node('EoD:n seuraamukset', 'Korjaus ≤ 30 pv · marginaali + ≤ 2,00 prosenttiyksikköä · eräännyttäminen.', 1400, 1730, 'Lähde luettelee cure≤30d, margin+≤2.00pp ja accelerate. Se ei kerro, ovatko nämä vaihtoehtoisia tai kumulatiivisia eikä missä järjestyksessä niitä käytetään.', 'Milloin korjausaika alkaa, ja estääkö korjaaminen marginaalikorotuksen tai eräännyttämisen?');
 const links = [[start,breach,'Testiajankohta'],[breach,compliant,'Ei ylitystä'],[breach,twice,'Ylitys'],[twice,watch,'Ensimmäinen peräkkäinen'],[twice,waiver,'Toinen peräkkäinen'],[waiver,reset,'Kirjallinen waiver'],[waiver,eod,'Ei kirjallista waiveria'],[eod,remedies,'Lähteen seuraamusluettelo']];
 const model = { revision: before.model.revision, nextNodeNumber: next, title: 'NetDebt / EBITDA — 3,50-kovenantti', entry: start, nodes, edges: links.map(([source,target,label],i) => ({ id: `COV_${i+1}`, source,target,label })) };
-const result = await api('/api/import', { model, expectedRevision: before.model.revision });
+const result = await api('/api/model', { model, expectedRevision: before.model.revision });
 await api('/api/selection', { id: null });
 const verified = await api('/api/state');
 if (verified.model.nodes.length !== nodes.length || verified.model.entry !== start) throw new Error('Verification failed');

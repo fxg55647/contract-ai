@@ -1088,6 +1088,14 @@ code {
   margin-top: 9px;
   font-size: 10px;
 }
+.document-notice {
+  flex-shrink: 0;
+  margin: 0;
+  border-width: 0 0 1px;
+  border-radius: 0;
+  padding: 9px 28px;
+  font-size: 12px;
+}
 .issue-card {
   text-align: left;
   display: block;

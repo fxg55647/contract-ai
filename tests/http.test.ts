@@ -6,7 +6,7 @@ import { createApp } from "../server/http";
 import { WorkspaceStore } from "../server/store";
 import { newNode } from "../shared/model";
 
-test("HTTP source import, model export and live editing work without AI credentials", async () => {
+test("HTTP source import, DOCX save and live editing work without AI credentials", async () => {
   const store = new WorkspaceStore();
   const server = createApp(store).listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -41,9 +41,21 @@ test("HTTP source import, model export and live editing work without AI credenti
     const source = await post("/api/sources", { title: "Agreement", content: "  1. Delivery\nDeliver within 14 days.  " });
     assert.equal(source.status, 200);
     assert.equal(store.snapshot().sourceDocuments[0].content, "  1. Delivery\nDeliver within 14 days.  ");
-    const pkg = await (await fetch(base + "/api/package")).json();
-    assert.equal(pkg.format, "contract-map");
-    assert.equal(pkg.sourceDocuments.length, 1);
+    const saved = await fetch(base + "/api/document/save", { method: "POST" });
+    assert.equal(saved.status, 200);
+    assert.match(saved.headers.get("content-type") ?? "", /wordprocessingml/);
+    const docx = Buffer.from(await saved.arrayBuffer());
+    assert.equal(docx.subarray(0, 2).toString(), "PK");
+    const opened = await fetch(base + "/api/document/open?expectedRevision=1", {
+      method: "POST",
+      headers: {
+        "content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "x-document-name": encodeURIComponent("agreement.docx"),
+      },
+      body: docx,
+    });
+    assert.equal(opened.status, 200);
+    assert.equal((await opened.json()).sourceDocuments.length, 1);
     const ai = await post("/api/chat", { apiKey: "test-secret-never-saved" });
     assert.equal(ai.status, 404);
     assert.ok(!JSON.stringify(store.snapshot()).includes("test-secret-never-saved"));

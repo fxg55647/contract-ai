@@ -15,7 +15,8 @@ import {
   type Workspace,
 } from "../shared/model";
 import { createSourceDocument, sourceDocumentSchema, uniqueSourceReferences, type SourceDocument } from "../shared/sources";
-import { packageSchema } from '../shared/package';
+import { embeddedDocumentSchema } from "../shared/document";
+import { newDocumentId, readDocx, writeDocx, type ReadDocx } from "./docx";
 
 const messageSchema = z.object({
   id: z.string(),
@@ -34,15 +35,23 @@ const changeSchema = z.object({
 const savedSchema = z.object({
   model: modelSchema,
   messages: z.array(messageSchema),
-  sourceDocuments: z.array(sourceDocumentSchema).max(100).default([]),
-  nextDocumentNumber: z.number().int().positive().max(999999).default(1),
+  sourceDocuments: z.array(sourceDocumentSchema).max(100),
+  nextDocumentNumber: z.number().int().positive().max(999999),
   selection: z.string().nullable(),
   draft: z.object({ text: z.string(), revision: z.number() }).nullable(),
   lastChange: changeSchema.nullable(),
   history: z.array(changeSchema),
   undo: z.array(modelSchema),
   redo: z.array(modelSchema),
-});
+  document: z.object({
+    id: z.string().uuid(),
+    fileName: z.string().min(1).max(200),
+    packageBase64: z.string().nullable(),
+    textFingerprint: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
+    textChanged: z.boolean(),
+    dirty: z.boolean(),
+  }).strict(),
+}).strict();
 type Saved = z.infer<typeof savedSchema>;
 export class WorkspaceStore {
   private data: Saved;
@@ -59,6 +68,14 @@ export class WorkspaceStore {
       history: [],
       undo: [],
       redo: [],
+      document: {
+        id: newDocumentId(),
+        fileName: "sopimus.docx",
+        packageBase64: null,
+        textFingerprint: null,
+        textChanged: false,
+        dirty: true,
+      },
     };
     if (file) {
       try {
@@ -83,12 +100,18 @@ export class WorkspaceStore {
     }
   }
   snapshot(aiConfigured = false): Workspace {
-    const { undo, redo, nextDocumentNumber: _nextDocumentNumber, ...data } = structuredClone(this.data);
+    const { undo, redo, nextDocumentNumber: _nextDocumentNumber, document, ...data } = structuredClone(this.data);
     return {
       ...data,
       canUndo: undo.length > 0,
       canRedo: redo.length > 0,
       aiConfigured,
+      document: {
+        id: document.id,
+        fileName: document.fileName,
+        dirty: document.dirty,
+        textChanged: document.textChanged,
+      },
     };
   }
   subscribe(listener: () => void) {
@@ -167,9 +190,10 @@ export class WorkspaceStore {
       selection: model.nodes.some((n) => n.id === this.data.selection)
         ? this.data.selection
         : null,
+      document: { ...this.data.document, dirty: true },
     });
   }
-  restore(input: unknown, revision: number, actor: string) {
+  replaceModel(input: unknown, revision: number, actor: string) {
     this.assertRevision(revision);
     const incoming = this.uniqueNodeSourceReferences(validateModel(input));
     this.assertSourceReferences(incoming);
@@ -183,7 +207,7 @@ export class WorkspaceStore {
     };
     this.commit(
       model,
-      "Tuotu tallennettu sopimusrakenne",
+      "Sopimusrakenne vaihdettu",
       actor,
       [...this.data.undo, this.data.model].slice(-50),
       [],
@@ -247,20 +271,15 @@ export class WorkspaceStore {
       ...this.data,
       sourceDocuments: [...this.data.sourceDocuments, document],
       nextDocumentNumber: this.data.nextDocumentNumber + 1,
+      document: { ...this.data.document, dirty: true },
     });
     return structuredClone(document);
   }
-  exportPackage() {
-    return structuredClone({ format: 'contract-map' as const, formatVersion: 1 as const,
-      model: this.data.model, sourceDocuments: this.data.sourceDocuments });
-  }
-  importPackage(input: unknown, revision: number) {
-    this.assertRevision(revision);
-    const incoming = packageSchema.parse(input);
-    validateModel(incoming.model);
-    this.assertSourceReferences(incoming.model, incoming.sourceDocuments);
+  private assertDocumentSources(model: ContractModel, sourceDocuments: SourceDocument[]) {
+    validateModel(model);
+    this.assertSourceReferences(model, sourceDocuments);
     const sourceIds = new Set<string>();
-    for (const document of incoming.sourceDocuments) {
+    for (const document of sourceDocuments) {
       if (sourceIds.has(document.id)) throw new ModelError('Lähdedokumentin tunniste toistuu.');
       sourceIds.add(document.id);
       const canonical = createSourceDocument(document.content, Number(document.id.slice(1)), document.messageId, document.createdAt);
@@ -272,37 +291,75 @@ export class WorkspaceStore {
         fragments.add(fragment.id);
       }
     }
-    // Keep immutable sources used by undo history; reallocate incoming IDs on collision.
-    const sources = structuredClone(this.data.sourceDocuments);
-    let next = this.data.nextDocumentNumber;
-    const mapping = new Map<string, string>();
-    for (const document of incoming.sourceDocuments) {
-      const id = `D${next++}`;
-      mapping.set(document.id, id);
-      sources.push({ ...document, id, fragments: document.fragments.map(fragment => ({ ...fragment, id: id + fragment.id.slice(document.id.length) })) });
-    }
-    if (sources.length > 100) throw new ModelError('Tuonti ylittäisi 100 lähdedokumentin rajan.');
-    const model = this.uniqueNodeSourceReferences({
-      ...incoming.model,
-      revision: revision + 1,
-      nextNodeNumber: Math.max(incoming.model.nextNodeNumber, this.data.model.nextNodeNumber),
-      nodes: incoming.model.nodes.map((node) => ({
-        ...node,
-        sourceRefs: node.sourceRefs.map((ref) => ({
-          ...ref,
-          documentId: mapping.get(ref.documentId)!,
-          fragmentId: mapping.get(ref.documentId)! + ref.fragmentId.slice(ref.documentId.length),
-        })),
-      })),
+  }
+  openDocument(document: ReadDocx, revision: number) {
+    this.assertRevision(revision);
+    const embedded = document.embedded ? embeddedDocumentSchema.parse(document.embedded) : null;
+    const sourceDocuments = structuredClone(embedded?.sourceDocuments ?? []);
+    const incoming = this.uniqueNodeSourceReferences(embedded?.model ?? emptyModel());
+    this.assertDocumentSources(incoming, sourceDocuments);
+    const model = { ...incoming, revision: revision + 1 };
+    const nextDocumentNumber = Math.max(1, ...sourceDocuments.map((source) => Number(source.id.slice(1)) + 1));
+    const draft = embedded?.draft
+      ? { ...embedded.draft, revision: embedded.draft.revision === embedded.model.revision ? model.revision : embedded.draft.revision }
+      : null;
+    this.save({
+      model,
+      messages: [],
+      sourceDocuments,
+      nextDocumentNumber,
+      selection: null,
+      draft,
+      lastChange: null,
+      history: [],
+      undo: [],
+      redo: [],
+      document: {
+        id: embedded?.documentId ?? newDocumentId(),
+        fileName: document.fileName,
+        packageBase64: document.packageBase64,
+        textFingerprint: document.textFingerprint,
+        textChanged: document.textChanged,
+        dirty: false,
+      },
     });
-    const change = difference(this.data.model, model, 'Tuotu malli lähteineen', 'import');
-    this.save({ ...this.data, model, sourceDocuments: sources, nextDocumentNumber: next,
-      undo: [...this.data.undo, this.data.model].slice(-50), redo: [], selection: null, draft: null,
-      lastChange: change, history: [...this.data.history, change].slice(-100) });
     return this.snapshot();
+  }
+  async openDocumentBuffer(buffer: Buffer, fileName: string, revision: number) {
+    return this.openDocument(await readDocx(buffer, fileName), revision);
+  }
+  async saveDocument() {
+    const source = this.data;
+    const fileName = source.document.fileName;
+    const buffer = await writeDocx(source.document.packageBase64, {
+      format: "sopimuskartta-docx",
+      formatVersion: 1,
+      documentId: source.document.id,
+      model: structuredClone(source.model),
+      sourceDocuments: structuredClone(source.sourceDocuments),
+      draft: structuredClone(source.draft),
+    });
+    const reread = await readDocx(buffer, fileName);
+    if (this.data.document.id === source.document.id) {
+      const contentUnchanged =
+        this.data.model === source.model &&
+        this.data.sourceDocuments === source.sourceDocuments &&
+        this.data.draft === source.draft;
+      this.save({
+        ...this.data,
+        document: {
+          ...this.data.document,
+          packageBase64: buffer.toString("base64"),
+          textFingerprint: reread.textFingerprint,
+          textChanged: false,
+          dirty: contentUnchanged ? false : this.data.document.dirty,
+        },
+      });
+    }
+    return { buffer, fileName };
   }
   setDraft(text: string, revision: number) {
     this.assertRevision(revision);
-    this.save({ ...this.data, draft: { text, revision } });
+    this.save({ ...this.data, draft: { text, revision }, document: { ...this.data.document, dirty: true } });
   }
 }

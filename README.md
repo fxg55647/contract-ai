@@ -43,11 +43,11 @@ MCP antaa avustajalle työjärjestyksen: tuo lähde, lue kaikki katkelmasivut,
 mallinna ehdot ja seuraukset, liitä lähdeviitteet ja raportoi kattavuus.
 Skeemavalidointi tarkistaa viitteiden olemassaolon, ei tulkinnan oikeellisuutta.
 
-Tuo JSON hyväksyy vanhan graafin tai version 1 contract-map-paketin.
-Vie JSON sisältää graafin ja alkuperäiset lähdetekstit, ei keskustelua tai tunnuksia.
-Tuonti korvaa graafin; sen voi kumota. Aiemmat ja tuodut lähteet säilyvät
-muuttumattomina myös kumottaessa. Tunnisteet sovitetaan tuonnissa työtilaan.
-Paketti sisältää sopimustekstin ja sitä on käsiteltävä sen mukaisesti.
+Avaa ja tallenna työ selaimessa DOCX-dokumenttina. Diagrammin muokattava rakenne,
+lähdetekstit ja tekstiluonnos kulkevat dokumentin omassa dataosassa. Word ja
+LibreOffice näyttävät tavallisen dokumenttitekstin; erillisiä JSON-tiedostoja
+ei käytetä. Jos dokumenttitekstiä muutetaan tekstinkäsittelyohjelmassa, editori
+pyytää tarkistamaan diagrammin ja lähdeviitteet seuraavan avauksen yhteydessä.
 
 ## Ulkoisen tekoälyn MCP-yhteys
 
@@ -100,20 +100,19 @@ näkyvät selaimessa. MCP-yhteys ei edellytä AI-avainta sovelluksessa. ChatGPT-
   vedä kahvasta tyhjään tilaan. Yläkahvasta syntyy edeltävä vaihe.
 - Klikkaa yhteyttä muokataksesi sen ehtoa tai poistaaksesi sen.
 - Kumoaminen/palauttaminen koskee yhteistä mallia, myös MCP-muutoksia.
-- **Käy polku läpi** korostaa valitsemasi haarat. Se ei suorita ehtojen
-  laskentaa eikä päätä puolestasi, mikä haara juridisesti soveltuu.
 - **Esitysnäkymä** piilottaa keskustelun ja muokkaustoiminnot. Jaa selainikkuna
   tavallisen kokoustyökalun ruudunjaolla. Sovellus ei luo julkista jakolinkkiä.
-- **Vie JSON / Tuo JSON** tallentaa tai palauttaa sopimusmallin. Tuonti voidaan
-  kumota. Lähdedokumentit sisältyvät vientiin; keskustelu ja tunnukset eivät.
+- **Avaa dokumentti / Tallenna dokumentti** käsittelee yhtä DOCX-tiedostoa,
+  jonka mukana diagrammi ja lähteet kulkevat.
 - Tekstiluonnoksen tuottaa ulkoinen avustaja save_draft-työkalulla ja näyttää varoituksen, kun rakenne on muuttunut
   sen muodostamisen jälkeen. Mallivastaus näytetään tekstinä, ei suoritettavana HTML:nä.
 
 ## Tallennus ja rajaus
 
-Työtila tallentuu `.contract-data/workspace.json`-tiedostoon. Hakemisto on
-gitignoressa. Tiedosto sisältää sopimusmallin, keskustelun, tekstiluonnoksen ja
-kumoamishistorian; se ei ole salattu. `CONTRACT_DATA_FILE` vaihtaa sijainnin.
+Työtila palautuu paikallisesti `.contract-data/workspace.json`-tiedostosta.
+Käyttäjälle siirrettävä tiedosto on DOCX. Paikallinen palautumistiedosto sisältää
+aktiivisen dokumentin, sopimusmallin, tekstiluonnoksen ja kumoamishistorian eikä
+ole salattu. `CONTRACT_DATA_FILE` vaihtaa sen sijainnin.
 Palvelin kuuntelee vain paikallista loopback-osoitetta ja torjuu vieraan
 alkuperän selainpyynnöt. Tämä on yksi paikallinen työtila, ei julkinen
 monen käyttäjän pilvipalvelu.
@@ -131,13 +130,11 @@ Selainkokeet käyttävät Playwrightia. Jos Chromium puuttuu, asenna se komennol
 `npx playwright install chromium`. Testit eivät tarvitse maksullista API-avainta.
 
 [Arkkitehtuuri, mallin merkitys ja rajat](docs/architecture.md).
-## Lähde- ja siirtotyökalut
+## Lähdetyökalut
 
 - import_source_document: tallenna alkuperäinen teksti ja palauta dokumentin tunniste.
 - list_source_documents: luettele dokumentit ja katkelmien määrät.
 - read_source_fragments: lue katkelmat erissä; jatka nextOffset-arvolla kunnes null.
-- export_model: palauta koko siirtopaketti. Avustajan tiedostotyökalut tekevät ladattavan tiedoston.
-- import_model: validoi ja tuo siirtopaketti nykyisen revision perusteella.
 - save_draft: tallenna avustajan laatima luonnos nykyiseen malliversioon.
 
 Esimerkkipyyntö: ”Tuo tämä sopimus muuttumattomaksi lähteeksi. Lue kaikki katkelmat,
