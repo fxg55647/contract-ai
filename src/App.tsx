@@ -1,269 +1,494 @@
-import { useCallback, useRef, useState, useEffect } from "react";
-import { ChatPanel } from "./components/ChatPanel";
-import { GraphEditor } from "./components/GraphEditor";
-import { ApiKeyInput } from "./components/ApiKeyInput";
-import type { GraphNode, GraphEdge } from "./types";
+import { useEffect, useRef, useState } from "react";
+import { ContractCanvas } from "./components/ContractCanvas";
+import { Inspector } from "./components/Inspector";
+import { post } from "./api";
+import {
+  modelWarnings,
+  type Operation,
+  type Workspace,
+  type ContractModel,
+} from "../shared/model";
+import { exampleModel } from "../shared/example";
 
-const API_KEY_STORAGE = "claude-api-key";
-const MODEL = "claude-sonnet-4-6";
-
-type RawNode = { id: string; name: string; description?: string[] };
-type RawEdge = { from: string; to: string };
-
-const NODE_WIDTH = 260;
-const X_GAP = NODE_WIDTH + 60;
-const Y_GAP = 220;
-
-function autoLayout(entryId: string, rawNodes: RawNode[], edges: RawEdge[]): GraphNode[] {
-  const levels = new Map<string, number>();
-  const queue: string[] = [entryId];
-  levels.set(entryId, 0);
-
-  let i = 0;
-  while (i < queue.length) {
-    const id = queue[i++];
-    const level = levels.get(id)!;
-    for (const e of edges.filter((e) => e.from === id)) {
-      if (!levels.has(e.to)) {
-        levels.set(e.to, level + 1);
-        queue.push(e.to);
-      }
-    }
-  }
-  rawNodes.forEach((n) => { if (!levels.has(n.id)) levels.set(n.id, 0); });
-
-  const byLevel = new Map<number, string[]>();
-  for (const [id, level] of levels) {
-    if (!byLevel.has(level)) byLevel.set(level, []);
-    byLevel.get(level)!.push(id);
-  }
-
-  return rawNodes.map((n) => {
-    const level = levels.get(n.id) ?? 0;
-    const row = byLevel.get(level)!;
-    const idx = row.indexOf(n.id);
-    const rawDesc = n.description;
-    const description: string[] = Array.isArray(rawDesc)
-      ? rawDesc
-      : rawDesc != null
-      ? [String(rawDesc)]
-      : [];
-    return {
-      id: n.id,
-      name: n.name,
-      description,
-      position: {
-        x: (idx - (row.length - 1) / 2) * X_GAP,
-        y: level * Y_GAP,
-      },
-    };
-  });
+function download(name: string, content: string, type: string) {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-
-function extractJson(text: string): string {
-  const match = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (match) return match[1].trim();
-  return text.trim();
-}
-
-async function callClaude(apiKey: string, messages: { role: string; content: string }[]) {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
-    body: JSON.stringify({ model: MODEL, max_tokens: 4096, messages }),
-  });
-  if (!response.ok) {
-    const err = (await response.json().catch(() => ({}))) as { error?: { message?: string } };
-    throw new Error(err?.error?.message ?? `HTTP ${response.status}`);
-  }
-  const data = (await response.json()) as { content?: { text?: string }[] };
-  return data.content?.[0]?.text ?? "";
-}
-
-const SUGGEST_PROMPT = `Muunna käyttäjän kuvaama sopimuslogiikka eksplisiittiseksi graafiksi.
-Palauta vain JSON muodossa { entry, nodes, edges }.
-
-Säännöt:
-
-Käytä nodeille kenttiä id, name, description.
-
-Käytä edgeille kenttiä from, to.
-
-id on lyhyt ja vakaa snake_case-tunniste.
-
-name on lyhyt, näkyvä, 2–4 sanan ihmisen luettava nimi. Älä käytä pitkiä juridisia lauseita.
-
-description on valinnainen string-taulukko. Laita yksityiskohdat sinne.
-
-Kaikkien nodejen tulee olla saavutettavissa entry-nodesta.
-
-Jokaisella ei-terminaalisella nodella tulee olla vähintään yksi lähtevä edge.
-
-Graafi etenee pääasiassa ylhäältä alas, vaihe vaiheelta. Vältä leveää vaakarakennetta.
-
-Jos päätöksellä on useita lopputuloksia, tee jokaisesta oma edge.
-
-Palauta vain validi JSON, ei selitystekstiä.`;
-
-function App() {
-  const [graphNodes, setGraphNodes] = useState<GraphNode[]>([]);
-  const [graphEdges, setGraphEdges] = useState<GraphEdge[]>([]);
-  const [currentNodes, setCurrentNodes] = useState<GraphNode[]>([]);
-  const [currentEdges, setCurrentEdges] = useState<GraphEdge[]>([]);
-  const [generatedText, setGeneratedText] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isSuggesting, setIsSuggesting] = useState(false);
-  const [splitRatio, setSplitRatio] = useState(0.55);
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem(API_KEY_STORAGE) ?? "");
-  const sidebarRef = useRef<HTMLDivElement | null>(null);
-  const isDraggingRef = useRef(false);
-
+export default function App() {
+  const [state, setState] = useState<Workspace | null>(null);
+  const [connected, setConnected] = useState(false);
+  const [error, setError] = useState("");
+  const [writing, setWriting] = useState(false);
+  const [presenting, setPresenting] = useState(false);
+  const [fitToken, setFitToken] = useState(0);
+  const [panel, setPanel] = useState<
+    "issues" | "draft" | "history" | "mcp" | null
+  >(null);
+  const [edgeEdit, setEdgeEdit] = useState<{
+    id: string;
+    label: string;
+    revision: number;
+  } | null>(null);
+  const importInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    localStorage.setItem(API_KEY_STORAGE, apiKey);
-  }, [apiKey]);
-
-  useEffect(() => {
-    const handleMouseMove = (event: MouseEvent) => {
-      if (!isDraggingRef.current || !sidebarRef.current) return;
-      const rect = sidebarRef.current.getBoundingClientRect();
-      setSplitRatio(Math.min(0.85, Math.max(0.2, (event.clientY - rect.top) / rect.height)));
+    // The previous prototype persisted credentials; the new UI never retains them.
+    localStorage.removeItem("claude-api-key");
+    const events = new EventSource("/api/events");
+    events.onmessage = (event) => {
+      setState(JSON.parse(event.data));
+      setConnected(true);
     };
-    const handleMouseUp = () => { isDraggingRef.current = false; };
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
+    events.onerror = () => setConnected(false);
+    return () => events.close();
   }, []);
-
-  const handleGraphChange = useCallback((nodes: GraphNode[], edges: GraphEdge[]) => {
-    setCurrentNodes(nodes);
-    setCurrentEdges(edges);
-  }, []);
-
-  const handleSubmitPrompt = async (prompt: string) => {
-    if (!apiKey.trim()) {
-      alert("Please enter your Claude API key first.");
-      return;
-    }
-    setIsSuggesting(true);
+  async function action(endpoint: string, body: unknown) {
+    setError("");
     try {
-      const text = await callClaude(apiKey, [
-        { role: "user", content: SUGGEST_PROMPT + "\n\nKuvaus: " + prompt },
-      ]);
-      const parsed = JSON.parse(extractJson(text)) as {
-        entry: string;
-        nodes: RawNode[];
-        edges: RawEdge[];
-      };
-      setGraphNodes(autoLayout(parsed.entry, parsed.nodes, parsed.edges));
-      setGraphEdges(
-        parsed.edges.map((e, i) => ({ id: `e${i}_${e.from}_${e.to}`, source: e.from, target: e.to })),
-      );
+      await post(endpoint, body);
+      return true;
     } catch (err) {
-      alert(`Graph suggestion failed: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setIsSuggesting(false);
+      setError(err instanceof Error ? err.message : String(err));
+      return false;
     }
-  };
-
-  const generateContract = async () => {
-    if (!apiKey.trim()) {
-      alert("Please enter your Claude API key first.");
-      return;
-    }
-    setIsGenerating(true);
-    setGeneratedText(null);
+  }
+  async function change(
+    operations: Operation[],
+    summary: string,
+    revision = state?.model.revision,
+  ) {
+    if (!state || writing || !connected) return false;
+    setWriting(true);
     try {
-      const nodeList = currentNodes
-        .map((n) => `- "${n.name}"${n.description.length > 0 ? ": " + n.description.join("; ") : ""}`)
-        .join("\n");
-      const edgeList = currentEdges
-        .map((e) => {
-          const from = currentNodes.find((n) => n.id === e.source)?.name ?? e.source;
-          const to = currentNodes.find((n) => n.id === e.target)?.name ?? e.target;
-          return `- "${from}" → "${to}"`;
-        })
-        .join("\n");
-
-      const prompt = `You are a legal drafting expert specialising in finance and commercial contracts. Based on the following contract structure graph, generate formal contract clause language.\n\nNodes:\n${nodeList}\n\nRelationships:\n${edgeList}\n\nGenerate clear, formal contract text as numbered legal clauses. Be precise and use standard legal drafting conventions.\n\nReturn the output as clean HTML using only these tags: <h2>, <h3>, <p>, <ol>, <ul>, <li>, <strong>. No <html>, <head>, <body>, or inline styles.`;
-
-      setGeneratedText(await callClaude(apiKey, [{ role: "user", content: prompt }]));
-    } catch (err) {
-      setGeneratedText(`Error: ${err instanceof Error ? err.message : String(err)}`);
+      return await action("changes", {
+        operations,
+        summary,
+        expectedRevision: revision,
+      });
     } finally {
-      setIsGenerating(false);
+      setWriting(false);
     }
-  };
-
+  }
+  async function select(id: string | null) {
+    setEdgeEdit(null);
+    setPanel(null);
+    await action("selection", { id });
+  }
+  if (!state)
+    return (
+      <div className="loading-screen">
+        <div className="brand-mark">
+          s<span>·</span>
+        </div>
+        <h1>Sopimuskartta</h1>
+        <p>
+          {connected
+            ? "Avataan yhteistä työtilaa…"
+            : "Yhdistetään paikalliseen työtilaan…"}
+        </p>
+        <p className="muted">Käynnistä sovellus komennolla npm run dev.</p>
+      </div>
+    );
+  const model = state.model;
+  const selected = model.nodes.find((n) => n.id === state.selection);
+  const warnings = modelWarnings(model);
+  const openNodes = model.nodes.filter(
+    (n) => n.open,
+  );
+  const changed = [
+    ...(state.lastChange?.added ?? []),
+    ...(state.lastChange?.updated ?? []),
+  ];
+  async function importModel(value: unknown) {
+    if (
+      await action(value && typeof value === "object" && "format" in value ? "package" : "import", value && typeof value === "object" && "format" in value ? { package: value, expectedRevision: model.revision } : { model: value, expectedRevision: model.revision })
+    )
+      setFitToken((v) => v + 1);
+  }
+  function showPanel(next: typeof panel) {
+    setPanel(panel === next ? null : next);
+    setEdgeEdit(null);
+  }
+  const editable = connected && !writing && !presenting;
   return (
-    <div className="app-root">
-      <div className="app-layout">
-        <aside className="app-sidebar" ref={sidebarRef}>
-          <div className="sidebar-split">
-            <section
-              className="sidebar-pane sidebar-pane--top"
-              style={{ flexBasis: `${splitRatio * 100}%` }}
-            >
-              <ChatPanel onSubmitPrompt={handleSubmitPrompt} isLoading={isSuggesting} />
-            </section>
-
-            <div className="sidebar-resizer" onMouseDown={() => { isDraggingRef.current = true; }}>
-              <div className="sidebar-resizer-handle" />
-            </div>
-
-            <section
-              className="sidebar-pane sidebar-pane--bottom"
-              style={{ flexBasis: `${(1 - splitRatio) * 100}%` }}
-            >
-              <div className="generated-text-panel">
-                <h1 className="app-title">Draft contract text</h1>
-
-                <ApiKeyInput value={apiKey} onChange={setApiKey} />
-
-                <button
-                  type="button"
-                  className="generate-button"
-                  onClick={generateContract}
-                  disabled={isGenerating}
-                >
-                  {isGenerating ? "Generating..." : "Generate contract text"}
+    <div className={`app ${presenting ? "presenting" : ""}`}>
+      <header className="topbar">
+        <div className="brand">
+          <div className="brand-mark">
+            s<span>·</span>
+          </div>
+          <div>
+            <strong>Sopimuskartta</strong>
+            <span>Sopimus näkyväksi. Yhdessä.</span>
+          </div>
+        </div>
+        <div className="workspace-status">
+          <span className={`connection-dot ${connected ? "online" : ""}`} />
+          {connected
+            ? "Tallennettu paikallisesti"
+            : "Yhteys katkennut — yhdistetään uudelleen"}
+          <span className="version">v{model.revision}</span>
+        </div>
+        <div className="top-actions">
+          {!presenting && (
+            <>
+                <button onClick={() => showPanel("draft")}>
+                  Tekstiluonnos ↗
                 </button>
-
-                <div className="generated-text-body">
-                  {isGenerating ? (
-                    <p className="generated-text-empty">Calling Claude, please wait...</p>
-                  ) : generatedText ? (
-                    // eslint-disable-next-line react/no-danger
-                    <div className="generated-text-content" dangerouslySetInnerHTML={{ __html: generatedText }} />
-                  ) : (
-                    <p className="generated-text-empty">
-                      Enter your API key and click the button above to generate contract text from
-                      the current graph.
-                    </p>
-                  )}
+                <button
+                  onClick={() =>
+                    download(
+                      "sopimusrakenne.json",
+                      JSON.stringify({ format: "contract-map", formatVersion: 1, model, sourceDocuments: state.sourceDocuments }, null, 2),
+                      "application/json",
+                    )
+                  }
+                >
+                  Vie JSON
+                </button>
+                <button
+                  disabled={!editable}
+                  onClick={() => importInput.current?.click()}
+                >
+                  Tuo JSON
+                </button>
+                <input
+                  ref={importInput}
+                  type="file"
+                  accept=".json,application/json"
+                  className="sr-only"
+                  aria-label="Tuo sopimusrakenne"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      await importModel(JSON.parse(await file.text()));
+                    } catch {
+                      setError("Tiedosto ei ole kelvollista JSONia.");
+                    }
+                    e.target.value = "";
+                  }}
+                />
+            </>
+          )}
+          <button onClick={() => showPanel("mcp")}>MCP-yhteys ↗</button>
+          <button
+            className={presenting ? "primary" : ""}
+            onClick={() => {
+              setPresenting((v) => !v);
+              setFitToken((v) => v + 1);
+            }}
+          >
+            {presenting ? "Lopeta esitys" : "Esitysnäkymä"}
+          </button>
+        </div>
+      </header>
+      {error && (
+        <div className="error-banner" role="alert">
+          <span>{error}</span>
+          <button aria-label="Sulje virheilmoitus" onClick={() => setError("")}>
+            ×
+          </button>
+        </div>
+      )}
+      <div className="workspace">
+        <main className="canvas-panel">
+          <div className="graph-area">
+            <ContractCanvas
+              sourceDocuments={state.sourceDocuments}
+              model={model}
+              selected={state.selection}
+              changed={changed}
+              compact={false}
+              readOnly={!editable}
+              path={[]}
+              fitToken={fitToken}
+              onSelect={(id) => void select(id)}
+              onEdge={(id) => {
+                if (presenting) return;
+                const edge = model.edges.find((e) => e.id === id)!;
+                setEdgeEdit({
+                  id,
+                  label: edge.label,
+                  revision: model.revision,
+                });
+                setPanel(null);
+              }}
+              onChange={change}
+            />
+            {!model.nodes.length && (
+              <div className="empty-canvas">
+                <div className="empty-illustration">
+                  <span>Tilanne</span>
+                  <i>↓</i>
+                  <span className="decision-example">Mitä tapahtuu?</span>
+                  <i>↙　↘</i>
+                  <div>
+                    <span>Vaihtoehto A</span>
+                    <span>Vaihtoehto B</span>
+                  </div>
+                </div>
+                <h2>
+                  Yhteinen kuva siitä,
+                  <br />
+                  mitä on tarkoitus sopia.
+                </h2>
+                <p>
+                  Keskustelkaa ensin. Muodostakaa sitten kartta,
+                  <br />
+                  josta jokainen näkee ehdot ja seuraukset.
+                </p>
+                <div className="button-row">
+                  <button
+                    disabled={!editable}
+                    className="primary"
+                    onClick={() => void importModel(exampleModel())}
+                  >
+                    Tutustu esimerkillä
+                  </button>
                 </div>
               </div>
-            </section>
-          </div>
-        </aside>
+            )}
 
-        <main className="app-main">
-          <GraphEditor
-            initialNodes={graphNodes}
-            initialEdges={graphEdges}
-            onGraphChange={handleGraphChange}
-          />
+          </div>
         </main>
+        {selected && !panel && !edgeEdit && (
+          <Inspector
+            key={selected.id}
+            node={selected}
+            model={model}
+            sourceDocuments={state.sourceDocuments}
+            readOnly={!editable}
+            onClose={() => void select(null)}
+            onChange={change}
+          />
+        )}
+        {edgeEdit && (
+          <aside className="inspector">
+            <div className="panel-heading">
+              <h2>Yhteyden ehto</h2>
+              <button className="icon-button" onClick={() => setEdgeEdit(null)}>
+                ×
+              </button>
+            </div>
+            <div className="inspector-body">
+              <p>
+                {model.edges.find((e) => e.id === edgeEdit.id)?.source} →{" "}
+                {model.edges.find((e) => e.id === edgeEdit.id)?.target}
+              </p>
+              <label>
+                Milloin tätä polkua seurataan?
+                <input
+                  value={edgeEdit.label}
+                  onChange={(e) =>
+                    setEdgeEdit({ ...edgeEdit, label: e.target.value })
+                  }
+                  maxLength={160}
+                />
+              </label>
+              <div className="button-row">
+                <button
+                  className="primary"
+                  disabled={!editable}
+                  onClick={async () => {
+                    if (
+                      await change(
+                        [
+                          {
+                            type: "update_edge",
+                            id: edgeEdit.id,
+                            label: edgeEdit.label,
+                          },
+                        ],
+                        "Yhteyden ehto täsmennetty",
+                        edgeEdit.revision,
+                      )
+                    )
+                      setEdgeEdit(null);
+                  }}
+                >
+                  Tallenna ehto
+                </button>
+                <button
+                  disabled={!editable}
+                  onClick={async () => {
+                    if (
+                      await change(
+                        [{ type: "delete_edge", id: edgeEdit.id }],
+                        "Yhteys poistettu",
+                        edgeEdit.revision,
+                      )
+                    )
+                      setEdgeEdit(null);
+                  }}
+                >
+                  Poista yhteys
+                </button>
+              </div>
+            </div>
+          </aside>
+        )}
+        {panel && (
+          <aside className="inspector auxiliary-panel">
+            <div className="panel-heading">
+              <h2>
+                {
+                  {
+                    issues: "Avoimet asiat",
+                    draft: "Tekstiluonnos",
+                    history: "Muutoshistoria",
+                    mcp: "MCP-yhteys",
+                  }[panel]
+                }
+              </h2>
+              <button
+                className="icon-button"
+                aria-label="Sulje sivupaneeli"
+                onClick={() => setPanel(null)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="inspector-body">
+              {panel === "issues" && (
+                <>
+                  {openNodes.length === 0 && (
+                    <p>Ei kirjattuja avoimia kysymyksiä.</p>
+                  )}
+                  {openNodes.map((n) => (
+                    <button
+                      className="issue-card"
+                      key={n.id}
+                      onClick={() => void select(n.id)}
+                    >
+                      <span>
+                        {n.id} · {n.title}
+                      </span>
+                      <p>{n.text || "Vaihe odottaa täsmennystä."}</p>
+                    </button>
+                  ))}
+                  <h3>Rakenteen tarkistus</h3>
+                  {warnings.length ? (
+                    warnings.map((w, i) => (
+                      <button
+                        className="issue-card structural"
+                        key={i}
+                        onClick={() => void select(w.nodeId)}
+                      >
+                        {w.nodeId} · {w.text}
+                      </button>
+                    ))
+                  ) : (
+                    <p className="muted">
+                      Rakenteellisia puutteita ei havaittu. Tämä ei vahvista
+                      sopimuksen sisällön oikeellisuutta.
+                    </p>
+                  )}
+                </>
+              )}
+              {panel === "history" && (
+                <>
+                  {!state.history.length && <p>Ei vielä muutoksia.</p>}
+                  {[...state.history].reverse().map((c) => (
+                    <article className="history-item" key={c.revision}>
+                      <span className="eyebrow">
+                        VERSIO {c.revision} ·{" "}
+                        {c.actor === "editor" ? "KÄSIN" : c.actor.toUpperCase()}
+                      </span>
+                      <h3>{c.summary}</h3>
+                      <p>
+                        {c.added.length > 0 &&
+                          `Lisätty: ${c.added.join(", ")}. `}
+                        {c.updated.length > 0 &&
+                          `Muutettu: ${c.updated.join(", ")}. `}
+                        {c.removed.length > 0 &&
+                          `Poistettu: ${c.removed.join(", ")}.`}
+                      </p>
+                    </article>
+                  ))}
+                </>
+              )}
+              {panel === "draft" && (
+                <>
+                  <p>
+                    Luonnos muodostetaan nykyisestä rakenteesta. Avoimet kohdat
+                    jätetään näkyviin.
+                  </p>
+                  <p className="prompt-example">
+                    Pyydä ChatGPT:ssä: ”Muodosta nykyisestä mallista sopimusluonnos ja tallenna se työtilaan. Merkitse avoimet ehdot.”
+                  </p>
+                  {state.draft && (
+                    <>
+                      {state.draft.revision !== model.revision && (
+                        <div className="notice">
+                          Rakenne on muuttunut. Tämä teksti perustuu versioon{" "}
+                          {state.draft.revision}.
+                        </div>
+                      )}
+                      <div className="draft-text">{state.draft.text}</div>
+                      <button
+                        onClick={() =>
+                          download(
+                            "sopimusluonnos.txt",
+                            state.draft!.text,
+                            "text/plain;charset=utf-8",
+                          )
+                        }
+                      >
+                        Lataa teksti
+                      </button>
+                    </>
+                  )}
+                </>
+              )}
+              {panel === "mcp" && (
+                <>
+                  <div className="connection-card">
+                    <span className="connection-dot online" />
+                    Yhteinen paikallinen malli
+                  </div>
+                  <p>
+                    Ulkoinen tekoäly voi lukea ja muokata samaa
+                    sopimusrakennetta. Muutokset näkyvät tässä heti.
+                  </p>
+                  <ol className="instructions">
+                    <li>
+                      Pidä tämä sovellus ja paikallinen palvelin käynnissä.
+                    </li>
+                    <li>
+                      Liitä MCP-asiakkaaseen repon <code>server/mcp.ts</code>{" "}
+                      ohjeen mukaan.
+                    </li>
+                    <li>
+                      Pyydä lukemaan nykyinen työtila ja tekemään rajattuja
+                      muutoksia.
+                    </li>
+                  </ol>
+                  <p>
+                    Asennusohje on repon README-tiedostossa. Yhteyden
+                    käyttöönotto tehdään erikseen käyttämässäsi
+                    tekoälysovelluksessa.
+                  </p>
+                  <div className="prompt-example">
+                    ”Lue sopimuskartta. Muuta N4:n korjausaika alkamaan
+                    kirjallisen ilmoituksen vastaanottamisesta. Säilytä muut
+                    ehdot.”
+                  </div>
+                  <h3>Yhteinen esitys</h3>
+                  <p>
+                    Esitysnäkymä piilottaa muokkauspainikkeet.
+                    Voit jakaa tämän selainikkunan kokouksessa. Julkista
+                    jakolinkkiä ei luoda.
+                  </p>
+                </>
+              )}
+            </div>
+          </aside>
+        )}
       </div>
     </div>
   );
 }
-
-export default App;

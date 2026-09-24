@@ -1,6 +1,9 @@
 Contract Graph Specification (Demo Version)
 ===========================================
 
+> Historical prototype specification. The current shared model, MCP integration,
+> node statuses and edge conditions are described in [architecture.md](architecture.md).
+
 Introduction
 ------------
 

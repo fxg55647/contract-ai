@@ -1,404 +1,80 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import ReactFlow, {
-  Background,
-  Controls,
-  MiniMap,
-  Node,
-  Edge,
-  addEdge,
-  Connection,
-  useEdgesState,
-  useNodesState,
-  ReactFlowProvider,
-  useReactFlow,
-  OnConnectStart,
-  OnConnectEnd,
-  EdgeProps,
-  EdgeLabelRenderer,
-  getBezierPath,
-  BaseEdge,
-  MarkerType,
-  Position,
-} from "reactflow";
-import "reactflow/dist/style.css";
-import type { GraphNode, GraphEdge } from "../types";
+import { useEffect, useMemo } from 'react';
+import ReactFlow, { Background, Controls, MarkerType, MiniMap, Position, useNodesState, type Edge, type Node, type NodeProps } from 'reactflow';
+import 'reactflow/dist/style.css';
+import type { ContractModel, ContractNode } from '../../shared/model';
 
-type GraphEditorProps = {
-  initialNodes: GraphNode[];
-  initialEdges: GraphEdge[];
-  onGraphChange?: (nodes: GraphNode[], edges: GraphEdge[]) => void;
+type Props = {
+  model: ContractModel;
+  selected: string | null;
+  onSelect: (id: string | null) => void;
+  onMove: (id: string, position: { x: number; y: number }) => void;
 };
 
-const NODE_WIDTH = 260;
-const CHILD_Y_OFFSET = 220;
-
-function DeletableEdge(props: EdgeProps) {
-  const { setEdges } = useReactFlow();
-  const { id, sourceX, sourceY, targetX, targetY, selected, markerEnd } = props;
-  const goingDown = targetY >= sourceY;
-  const [edgePath, labelX, labelY] = getBezierPath({
-    sourceX,
-    sourceY,
-    sourcePosition: goingDown ? Position.Bottom : Position.Top,
-    targetX,
-    targetY,
-    targetPosition: goingDown ? Position.Top : Position.Bottom,
-  });
-
+function ContractCard({ data, selected }: NodeProps<ContractNode>) {
   return (
-    <>
-      <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} />
-      {selected && (
-        <EdgeLabelRenderer>
-          <div
-            style={{
-              position: "absolute",
-              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-              pointerEvents: "all",
-            }}
-            className="nodrag nopan"
-          >
-            <button
-              type="button"
-              className="edge-delete-btn"
-              onClick={() => setEdges((es) => es.filter((e) => e.id !== id))}
-            >
-              ×
-            </button>
-          </div>
-        </EdgeLabelRenderer>
-      )}
-    </>
-  );
-}
-
-const edgeTypes = { deletable: DeletableEdge };
-
-function createNodeLabel(
-  nodeId: string,
-  name: string,
-  description: string[],
-  onDelete: (id: string) => void,
-  onEdit: (id: string) => void,
-  onAddChild: (id: string) => void,
-) {
-  return (
-    <div className="graph-node">
-      <div className="graph-node-header">
-        <div className="graph-node-title">{name}</div>
-        <div className="graph-node-actions">
-          <button
-            type="button"
-            className="graph-node-action-btn graph-node-action-btn--add"
-            title="Add child node"
-            onClick={(e) => { e.stopPropagation(); onAddChild(nodeId); }}
-          >
-            +
-          </button>
-          <button
-            type="button"
-            className="graph-node-action-btn"
-            onClick={(e) => { e.stopPropagation(); onEdit(nodeId); }}
-          >
-            ✎
-          </button>
-          <button
-            type="button"
-            className="graph-node-action-btn graph-node-action-btn--danger"
-            onClick={(e) => { e.stopPropagation(); onDelete(nodeId); }}
-          >
-            ×
-          </button>
-        </div>
-      </div>
-      {Array.isArray(description) && description.length > 0 && (
-        <ul className="graph-node-list">
-          {description.map((item, i) => (
-            <li key={i}>{item}</li>
-          ))}
-        </ul>
-      )}
+    <div className={`contract-card ${selected ? 'is-selected' : ''}`}>
+      <div className="node-meta"><span>{data.id}</span>{data.open && <span className="status status-open">Avoin</span>}</div>
+      <strong>{data.title}</strong>
+      {data.text && <p>{data.text}</p>}
     </div>
   );
 }
 
-function toReactFlowEdges(edges: GraphEdge[]): Edge[] {
-  return edges.map((edge) => ({
-    id: edge.id,
-    source: edge.source,
-    target: edge.target,
-    type: "deletable",
-    markerEnd: { type: MarkerType.ArrowClosed },
-  }));
-}
+const nodeTypes = { contract: ContractCard };
 
-function GraphEditorInner({ initialNodes, initialEdges, onGraphChange }: GraphEditorProps) {
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node[]>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge[]>([]);
-  const { project } = useReactFlow();
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const connectingNodeId = useRef<string | null>(null);
-  const didConnectRef = useRef(false);
-  const idCounterRef = useRef(0);
-  const nodesRef = useRef(nodes);
-  nodesRef.current = nodes;
+export function GraphEditor({ model, selected, onSelect, onMove }: Props) {
+  const mappedNodes = useMemo<Node<ContractNode>[]>(() => model.nodes.map(node => ({
+    id: node.id,
+    type: 'contract',
+    position: node.position,
+    data: node,
+    selected: node.id === selected,
+    sourcePosition: Position.Bottom,
+    targetPosition: Position.Top,
+  })), [model.nodes, selected]);
+  const [nodes, setNodes, onNodesChange] = useNodesState(mappedNodes);
+  useEffect(() => setNodes(mappedNodes), [mappedNodes, setNodes]);
 
-  const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
-  const [draftName, setDraftName] = useState("");
-  const [draftDescription, setDraftDescription] = useState("");
-
-  // Stable wrappers — labels capture these once; they always delegate to handlersRef
-  const handlersRef = useRef({
-    delete: (_id: string) => {},
-    edit: (_id: string) => {},
-    addChild: (_id: string) => {},
-  });
-  const stableDelete = useCallback((id: string) => handlersRef.current.delete(id), []);
-  const stableEdit = useCallback((id: string) => handlersRef.current.edit(id), []);
-  const stableAddChild = useCallback((id: string) => handlersRef.current.addChild(id), []);
-
-  function handleEditNode(nodeId: string) {
-    const node = nodesRef.current.find((n) => n.id === nodeId);
-    const meta = node?.data?.meta as { name?: string; description?: string[] } | undefined;
-    const init = initialNodes.find((n) => n.id === nodeId);
-    setEditingNodeId(nodeId);
-    setDraftName(meta?.name ?? init?.name ?? "");
-    setDraftDescription((meta?.description ?? init?.description ?? []).join("\n"));
-  }
-
-  function handleDeleteNode(nodeId: string) {
-    setNodes((ns) => ns.filter((n) => n.id !== nodeId));
-    setEdges((es) => es.filter((e) => e.source !== nodeId && e.target !== nodeId));
-  }
-
-  function handleAddChild(sourceId: string) {
-    const newId = `new_${Date.now()}_${idCounterRef.current++}`;
-    const newName = "New Step";
-    const newDescription: string[] = [];
-
-    setNodes((current) => {
-      const source = current.find((n) => n.id === sourceId);
-      const sourcePos = source?.position ?? { x: 0, y: 0 };
-      return [
-        ...current,
-        {
-          id: newId,
-          position: { x: sourcePos.x, y: sourcePos.y + CHILD_Y_OFFSET },
-          data: {
-            meta: { name: newName, description: newDescription },
-            label: createNodeLabel(newId, newName, newDescription, stableDelete, stableEdit, stableAddChild),
-          },
-          style: { width: NODE_WIDTH },
-        },
-      ];
-    });
-    setEdges((es) => [
-      ...es,
-      { id: `e_${sourceId}_${newId}`, source: sourceId, target: newId, type: "deletable", markerEnd: { type: MarkerType.ArrowClosed } },
-    ]);
-  }
-
-  // Keep handlersRef current every render
-  handlersRef.current.delete = handleDeleteNode;
-  handlersRef.current.edit = handleEditNode;
-  handlersRef.current.addChild = handleAddChild;
-
-  function handleSaveEdit() {
-    if (!editingNodeId) return;
-    const name = draftName.trim() || "Untitled";
-    const description = draftDescription
-      .split(/\r?\n/)
-      .map((l) => l.trim())
-      .filter(Boolean);
-    setNodes((current) =>
-      current.map((node) => {
-        if (node.id !== editingNodeId) return node;
-        return {
-          ...node,
-          data: {
-            ...node.data,
-            meta: { name, description },
-            label: createNodeLabel(node.id, name, description, stableDelete, stableEdit, stableAddChild),
-          },
-        };
-      }),
-    );
-    setEditingNodeId(null);
-  }
-
-  function handleCancelEdit() {
-    setEditingNodeId(null);
-  }
-
-  const onConnect = useCallback(
-    (connection: Connection) => {
-      didConnectRef.current = true;
-      setEdges((eds) => addEdge({ ...connection, type: "deletable", markerEnd: { type: MarkerType.ArrowClosed } }, eds));
-    },
-    [setEdges],
-  );
-
-  const onConnectStart: OnConnectStart = useCallback((_, { nodeId }) => {
-    connectingNodeId.current = nodeId;
-  }, []);
-
-  const onConnectEnd: OnConnectEnd = useCallback(
-    (event) => {
-      const sourceId = connectingNodeId.current;
-      connectingNodeId.current = null;
-      if (!sourceId) return;
-      if (didConnectRef.current) { didConnectRef.current = false; return; }
-
-      const mouseEvent = event as MouseEvent;
-      const target = mouseEvent.target as Element;
-      if (!target.classList.contains("react-flow__pane")) return;
-
-      const wrapper = wrapperRef.current;
-      if (!wrapper) return;
-
-      const { left, top } = wrapper.getBoundingClientRect();
-      const position = project({ x: mouseEvent.clientX - left, y: mouseEvent.clientY - top });
-
-      const newId = `new_${Date.now()}_${idCounterRef.current++}`;
-      const newName = "New Step";
-      const newDescription: string[] = [];
-
-      setNodes((ns) => [
-        ...ns,
-        {
-          id: newId,
-          position,
-          data: {
-            meta: { name: newName, description: newDescription },
-            label: createNodeLabel(newId, newName, newDescription, stableDelete, stableEdit, stableAddChild),
-          },
-          style: { width: NODE_WIDTH },
-        },
-      ]);
-      setEdges((es) => [
-        ...es,
-        { id: `e_${sourceId}_${newId}`, source: sourceId, target: newId, type: "deletable", markerEnd: { type: MarkerType.ArrowClosed } },
-      ]);
-    },
-    [project, setNodes, setEdges],
-  );
-
-  // Notify parent of graph changes
-  useEffect(() => {
-    if (!onGraphChange) return;
-    const graphNodes: GraphNode[] = nodes.map((n) => ({
-      id: n.id,
-      name: (n.data?.meta as { name?: string })?.name ?? n.id,
-      description: (n.data?.meta as { description?: string[] })?.description ?? [],
-      position: n.position,
-    }));
-    const graphEdges: GraphEdge[] = edges.map((e) => ({
-      id: e.id,
-      source: e.source,
-      target: e.target,
-    }));
-    onGraphChange(graphNodes, graphEdges);
-  }, [nodes, edges, onGraphChange]);
-
-  // Sync edges when prop changes
-  useEffect(() => {
-    setEdges(toReactFlowEdges(initialEdges));
-  }, [initialEdges, setEdges]);
-
-  // Sync nodes when prop changes
-  useEffect(() => {
-    setNodes(
-      initialNodes.map((node) => {
-        const desc = Array.isArray(node.description) ? node.description : [];
-        return {
-          id: node.id,
-          position: node.position,
-          data: {
-            meta: { name: node.name, description: desc },
-            label: createNodeLabel(node.id, node.name, desc, stableDelete, stableEdit, stableAddChild),
-          },
-          style: { width: NODE_WIDTH },
-        };
-      }),
-    );
-  }, [initialNodes, setNodes]);
+  const edges = useMemo<Edge[]>(() => model.edges.map(edge => ({
+    ...edge,
+    type: 'smoothstep',
+    label: edge.label,
+    markerEnd: { type: MarkerType.ArrowClosed, color: '#6b746d' },
+    style: { stroke: '#879087', strokeWidth: 1.5 },
+    labelStyle: { fill: '#4d584f', fontSize: 12, fontWeight: 600 },
+    labelBgStyle: { fill: '#f5f3ed', fillOpacity: 0.94 },
+    labelBgPadding: [6, 4],
+    labelBgBorderRadius: 4,
+  })), [model.edges]);
 
   return (
-    <div className="graph-editor">
-      <div className="graph-header">
-        <div className="graph-header-text">
-          <h2>Graph</h2>
-          <p className="graph-caption">
-            Drag from a node handle to connect or create a new step. Click an edge to delete it.
-          </p>
-        </div>
-      </div>
-
-      {editingNodeId && (
-        <div className="graph-edit-panel">
-          <div className="graph-edit-row">
-            <label className="graph-edit-label" htmlFor="node-name-input">
-              Name
-            </label>
-            <input
-              id="node-name-input"
-              className="graph-edit-input"
-              value={draftName}
-              onChange={(e) => setDraftName(e.target.value)}
-            />
-          </div>
-          <div className="graph-edit-row">
-            <label className="graph-edit-label" htmlFor="node-desc-input">
-              Description (one line per item)
-            </label>
-            <textarea
-              id="node-desc-input"
-              className="graph-edit-textarea"
-              rows={4}
-              value={draftDescription}
-              onChange={(e) => setDraftDescription(e.target.value)}
-            />
-          </div>
-          <div className="graph-edit-actions">
-            <button
-              type="button"
-              className="graph-edit-button graph-edit-button--primary"
-              onClick={handleSaveEdit}
-            >
-              Save
-            </button>
-            <button type="button" className="graph-edit-button" onClick={handleCancelEdit}>
-              Cancel
-            </button>
-          </div>
+    <div className="graph-canvas">
+      {nodes.length === 0 && (
+        <div className="graph-empty">
+          <div className="tree-symbol">⌘</div>
+          <h2>Puusi kasvaa tähän</h2>
+          <p>Liitä vasemmalle sopimusteksti tai kuvaile ehto ja valitse <strong>Visualisoi puuksi</strong>.</p>
         </div>
       )}
-
-      <div ref={wrapperRef} className="graph-canvas">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          edgeTypes={edgeTypes}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onConnectStart={onConnectStart}
-          onConnectEnd={onConnectEnd}
-          fitView
-        >
-          <MiniMap />
-          <Controls />
-          <Background gap={16} size={1} />
-        </ReactFlow>
-      </div>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        onNodesChange={onNodesChange}
+        fitView
+        fitViewOptions={{ padding: 0.25 }}
+        minZoom={0.2}
+        maxZoom={1.6}
+        onPaneClick={() => onSelect(null)}
+        onNodeClick={(_, node) => onSelect(node.id)}
+        onNodeDragStop={(_, node) => onMove(node.id, node.position)}
+        nodesConnectable={false}
+        elementsSelectable
+      >
+        <Background color="#d8d5ca" gap={24} size={1} />
+        <MiniMap pannable zoomable nodeColor="#dce8df" maskColor="rgba(247, 246, 241, .72)" />
+        <Controls showInteractive={false} />
+      </ReactFlow>
     </div>
-  );
-}
-
-export function GraphEditor(props: GraphEditorProps) {
-  return (
-    <ReactFlowProvider>
-      <GraphEditorInner {...props} />
-    </ReactFlowProvider>
   );
 }

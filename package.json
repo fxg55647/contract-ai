@@ -2,26 +2,38 @@
   "name": "contract-graph",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "lint": "echo \"No linter configured\"",
-    "test": "echo \"No tests configured\""
+    "dev": "concurrently -k -n server,web \"tsx watch server/http.ts\" \"vite\"",
+    "build": "tsc --noEmit && vite build",
+    "start": "tsx server/http.ts",
+    "mcp": "tsx server/mcp.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "test:e2e": "playwright test"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "Interactive contract-structure editor for covenants and other deal mechanics.",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "express": "^5.2.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "reactflow": "^11.11.4"
+    "reactflow": "^11.11.4",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.13.6",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.4",
+    "concurrently": "^9.2.4",
+    "prettier": "^3.9.8",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vite": "^7.3.1"
   }
