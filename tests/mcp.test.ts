@@ -30,9 +30,22 @@ test("real MCP stdio client can read, edit, focus and undo the same HTTP workspa
   try {
     await client.connect(transport);
     const names = (await client.listTools()).tools.map(tool => tool.name);
-    assert.ok(names.includes("import_source_document"));
+    assert.ok(names.includes("register_live_source_excerpts"));
+    assert.ok(!names.includes("import_source_document"));
     assert.ok(!names.includes("export_model"));
-    const imported = await client.callTool({ name: "import_source_document", arguments: { title: "Agreement", content: "1. Delivery\nThe supplier delivers by June 30." } });
+    const imported = await client.callTool({
+      name: "register_live_source_excerpts",
+      arguments: {
+        title: "Agreement",
+        application: "libreoffice-writer",
+        externalDocumentId: "writer-doc-1",
+        excerpts: [{
+          locator: "bookmark:delivery",
+          heading: "1. Delivery",
+          quote: "The supplier delivers by June 30.",
+        }],
+      },
+    });
     assert.ok(!imported.isError);
     const excerpts = await client.callTool({ name: "read_source_fragments", arguments: { documentId: "D1", offset: 0, limit: 1 } });
     assert.ok(!excerpts.isError);

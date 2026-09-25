@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -14,6 +14,7 @@ import {
 } from "../shared/model";
 import { exampleModel } from "../shared/example";
 import { WorkspaceStore } from "../server/store";
+import { separateBoxesAroundObstacles } from "../shared/layout";
 
 const apply = (store: WorkspaceStore, operations: Operation[]) =>
   store.apply(
@@ -50,9 +51,9 @@ test("stale AI changes cannot overwrite human edits", () => {
         },
         "ai",
       ),
-    /muuttui/,
+    /map changed/,
   );
-  assert.equal(store.snapshot().model.title, "Uusi sopimusrakenne");
+  assert.equal(store.snapshot().model.title, "New semantic map");
 });
 test("targeted edits preserve identity and human layout", () => {
   const model = exampleModel();
@@ -91,7 +92,7 @@ test("deletion cleans up edges and undo restores them without reusing IDs", () =
   assert.throws(
     () =>
       apply(store, [{ type: "add_node", node: newNode("N7", { x: 0, y: 0 }) }]),
-    /käytetty/,
+    /already used/,
   );
 });
 test("duplicates, self loops, missing entry and malformed data are rejected", () => {
@@ -121,6 +122,17 @@ test("new siblings use free space instead of stacking", () => {
   const position = freePosition([first], first.position);
   assert.ok(position.x >= first.position.x + 440);
 });
+test("nodes move away from fixed edge labels while the label origin stays fixed", () => {
+  const boxes = [
+    { id: "N1", x: 0, y: 0, width: 100, height: 100 },
+    { id: "N2", x: 130, y: 0, width: 100, height: 100 },
+  ];
+  const label = { id: "label-E1", ownerId: "N1", x: 112, y: 20, width: 90, height: 30 };
+  const result = separateBoxesAroundObstacles(boxes, [label], false);
+  assert.deepEqual(result[0], boxes[0]);
+  assert.ok(result[1].x >= label.x + label.width + 18);
+  assert.deepEqual(label, { id: "label-E1", ownerId: "N1", x: 112, y: 20, width: 90, height: 30 });
+});
 
 test("unpositioned AI additions follow their parent without moving existing nodes", () => {
   const before = exampleModel();
@@ -145,13 +157,13 @@ test("structural warnings retain unresolved and disconnected content", () => {
   model.nextNodeNumber = 8;
   assert.ok(
     modelWarnings(model).some(
-      (w) => w.nodeId === "N7" && w.text.includes("aloituskohdasta"),
+      (w) => w.nodeId === "N7" && w.text.includes("start node"),
     ),
   );
   model.edges.filter((e) => e.source === "N1").forEach((e) => { e.label = ""; });
   assert.ok(
     modelWarnings(model).some(
-      (w) => w.nodeId === "N1" && w.text.includes("vaihtoehtojen"),
+      (w) => w.nodeId === "N1" && w.text.includes("Branch conditions"),
     ),
   );
 });
@@ -169,6 +181,36 @@ test("workspace survives restart with selection, conversation and undo history",
     reopened.undo(1);
     assert.equal(reopened.snapshot().model.nodes.length, 0);
     assert.equal(reopened.snapshot().selection, null);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+test("pre-DOCX workspace migrates missing metadata without losing model or history", () => {
+  const dir = mkdtempSync(join(tmpdir(), "contract-migration-test-"));
+  try {
+    const file = join(dir, "workspace.json");
+    const store = new WorkspaceStore(file);
+    store.replaceModel(exampleModel(), 0, "test");
+    store.select("N4");
+    const legacy = JSON.parse(readFileSync(file, "utf8"));
+    delete legacy.document;
+    const original = JSON.stringify(legacy);
+    writeFileSync(file, original);
+    const reopened = new WorkspaceStore(file);
+    assert.deepEqual(reopened.snapshot().model, store.snapshot().model);
+    assert.equal(reopened.snapshot().selection, "N4");
+    assert.equal(readFileSync(file, "utf8"), original);
+    reopened.select("N4");
+    const restarted = new WorkspaceStore(file);
+    assert.deepEqual(restarted.snapshot(), reopened.snapshot());
+    restarted.undo(1);
+    assert.equal(restarted.snapshot().model.nodes.length, 0);
+    for (const document of [null, {}]) {
+      const invalid = JSON.stringify({ ...legacy, document });
+      writeFileSync(file, invalid);
+      assert.throws(() => new WorkspaceStore(file), /could not be read/);
+      assert.equal(readFileSync(file, "utf8"), invalid);
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

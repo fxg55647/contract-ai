@@ -1,5 +1,5 @@
 {
-  "name": "contract-graph",
+  "name": "semantic-logic-mapper",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -8,6 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "start": "tsx server/http.ts",
     "mcp": "tsx server/mcp.ts",
+    "mcp:check": "node scripts/check-mcp.mjs",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "test:e2e": "playwright test"

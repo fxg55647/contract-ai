@@ -4,7 +4,7 @@ import { sourceReferenceSchema, type SourceDocument } from "./sources";
 const text = z.string().trim().min(1).max(4000);
 export const nodeIdSchema = z
   .string()
-  .regex(/^N[1-9]\d{0,5}$/, "Node-tunnisteen on oltava esimerkiksi N7.");
+  .regex(/^N[1-9]\d{0,5}$/, "A node identifier must look like N7.");
 const positionSchema = z
   .object({ x: z.number().finite(), y: z.number().finite() })
   .strict();
@@ -16,6 +16,7 @@ export const nodeSchema = z
     open: z.boolean(),
     sourceRefs: z.array(sourceReferenceSchema).max(32),
     position: positionSchema,
+    positionLocked: z.boolean().optional(),
   })
   .strict();
 export const edgeSchema = z
@@ -97,6 +98,8 @@ export type Change = {
 };
 export type Workspace = {
   model: ContractModel;
+  maps: Array<{ id: string; title: string; nodeCount: number; revision: number }>;
+  activeMapId: string;
   messages: Message[];
   sourceDocuments: SourceDocument[];
   selection: string | null;
@@ -120,7 +123,7 @@ export function emptyModel(): ContractModel {
   return {
     revision: 0,
     nextNodeNumber: 1,
-    title: "Uusi sopimusrakenne",
+    title: "New semantic map",
     entry: null,
     nodes: [],
     edges: [],
@@ -130,23 +133,23 @@ export function validateModel(input: unknown): ContractModel {
   const m = modelSchema.parse(input);
   const ids = new Set(m.nodes.map((n) => n.id));
   if (ids.size !== m.nodes.length)
-    throw new ModelError("Node-tunnisteet eivät ole yksilöllisiä.");
+    throw new ModelError("Node identifiers must be unique.");
   if (m.nodes.length && (!m.entry || !ids.has(m.entry)))
-    throw new ModelError("Valitse olemassa oleva aloitusnode.");
+    throw new ModelError("Select an existing start node.");
   if (!m.nodes.length && m.entry)
-    throw new ModelError("Tyhjällä mallilla ei voi olla aloitusnodea.");
+    throw new ModelError("An empty map cannot have a start node.");
   if (m.nodes.some((n) => Number(n.id.slice(1)) >= m.nextNodeNumber))
-    throw new ModelError("Seuraava node-tunniste ei ole vapaa.");
+    throw new ModelError("The next node identifier is not available.");
   const edgeIds = new Set<string>();
   const pairs = new Set<string>();
   for (const e of m.edges) {
     if (!ids.has(e.source) || !ids.has(e.target))
-      throw new ModelError(`Yhteys ${e.id} viittaa puuttuvaan nodeen.`);
+      throw new ModelError(`Connection ${e.id} refers to a missing node.`);
     if (e.source === e.target)
-      throw new ModelError("Nodea ei voi yhdistää itseensä.");
+      throw new ModelError("A node cannot connect to itself.");
     const pair = `${e.source}:${e.target}`;
     if (edgeIds.has(e.id) || pairs.has(pair))
-      throw new ModelError("Sama yhteys on jo olemassa.");
+      throw new ModelError("The same connection already exists.");
     edgeIds.add(e.id);
     pairs.add(pair);
   }
@@ -173,7 +176,7 @@ export function newNode(
 ): ContractNode {
   return {
     id,
-    title: "Uusi vaihe",
+    title: "New step",
     text: "",
     open: false,
     sourceRefs: [],
@@ -187,7 +190,7 @@ export function applyPatch(
   const patch = patchSchema.parse(input);
   if (patch.expectedRevision !== model.revision)
     throw new ModelError(
-      "Rakenne muuttui toisessa näkymässä. Tarkista uusin versio ja tee muutos uudelleen.",
+      "The map changed in another view. Review the latest version and try again.",
       409,
     );
   const m = structuredClone(model);
@@ -201,7 +204,7 @@ export function applyPatch(
           Number(op.node.id.slice(1)) < model.nextNodeNumber
         )
           throw new ModelError(
-            `Tunniste ${op.node.id} on jo käytetty. Käytä seuraavaa vapaata tunnistetta.`,
+            `Identifier ${op.node.id} is already used. Use the next available identifier.`,
           );
         allocated.add(op.node.id);
         if (!op.node.position) automatic.add(op.node.id);
@@ -218,13 +221,13 @@ export function applyPatch(
       }
       case "update_node": {
         const node = m.nodes.find((n) => n.id === op.id);
-        if (!node) throw new ModelError(`Nodea ${op.id} ei löydy.`);
+        if (!node) throw new ModelError(`Node ${op.id} was not found.`);
         Object.assign(node, op.changes);
         break;
       }
       case "delete_node":
         if (!m.nodes.some((n) => n.id === op.id))
-          throw new ModelError(`Nodea ${op.id} ei löydy.`);
+          throw new ModelError(`Node ${op.id} was not found.`);
         m.nodes = m.nodes.filter((n) => n.id !== op.id);
         m.edges = m.edges.filter(
           (e) => e.source !== op.id && e.target !== op.id,
@@ -236,13 +239,13 @@ export function applyPatch(
         break;
       case "update_edge": {
         const edge = m.edges.find((e) => e.id === op.id);
-        if (!edge) throw new ModelError("Yhteyttä ei löydy.");
+        if (!edge) throw new ModelError("Connection not found.");
         edge.label = op.label;
         break;
       }
       case "delete_edge":
         if (!m.edges.some((e) => e.id === op.id))
-          throw new ModelError("Yhteyttä ei löydy.");
+          throw new ModelError("Connection not found.");
         m.edges = m.edges.filter((e) => e.id !== op.id);
         break;
       case "set_entry":
@@ -301,13 +304,13 @@ export function modelWarnings(
   for (const node of model.nodes) {
     const outgoing = model.edges.filter((e) => e.source === node.id);
     if (!seen.has(node.id))
-      warnings.push({ nodeId: node.id, text: "Ei polkua aloituskohdasta" });
+      warnings.push({ nodeId: node.id, text: "No path from the start node" });
     if (
       outgoing.length > 1 && outgoing.some((e) => !e.label.trim())
     )
       warnings.push({
         nodeId: node.id,
-        text: "Haarautumisen vaihtoehtojen ehdot puuttuvat",
+        text: "Branch conditions are missing",
       });
   }
   return warnings;

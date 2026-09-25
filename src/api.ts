@@ -5,6 +5,6 @@ export async function post(path: string, body: unknown) {
     body: JSON.stringify(body),
   });
   const result = await response.json();
-  if (!response.ok) throw new Error(result.error || "Pyyntö epäonnistui.");
+  if (!response.ok) throw new Error(result.error || "Request failed.");
   return result;
 }

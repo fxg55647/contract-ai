@@ -16,7 +16,7 @@ test("DOCX carries the editable model, source quotes and draft as one file", asy
 
   const { buffer, fileName } = await original.saveDocument();
   assert.equal(buffer.subarray(0, 2).toString(), "PK");
-  assert.equal(fileName, "sopimus.docx");
+  assert.equal(fileName, "semantic-logic-map.docx");
   assert.equal(original.snapshot().document.dirty, false);
 
   const target = new WorkspaceStore();
@@ -28,6 +28,35 @@ test("DOCX carries the editable model, source quotes and draft as one file", asy
   assert.equal(state.model.nodes[0].sourceRefs[0].quote, "Delivery within 14 days.");
   assert.equal(state.sourceDocuments[0].content, source.content);
   assert.equal(state.draft?.text, "Contract draft");
+});
+
+test("DOCX carries multiple independent maps and the active map", async () => {
+  const original = new WorkspaceStore();
+  original.apply({
+    expectedRevision: 0,
+    summary: "First map",
+    operations: [{ type: "add_node", node: { ...newNode("N1", { x: 10, y: 20 }), title: "Ensimmäinen" } }],
+  }, "test");
+  original.createMap("Toinen mappi", 1);
+  original.apply({
+    expectedRevision: 2,
+    summary: "Second map",
+    operations: [{ type: "add_node", node: { ...newNode("N1", { x: 30, y: 40 }), title: "Toinen" } }],
+  }, "test");
+
+  const { buffer } = await original.saveDocument();
+  const target = new WorkspaceStore();
+  await target.openDocumentBuffer(buffer, "maps.docx", 0);
+  let state = target.snapshot();
+  assert.equal(state.maps.length, 2);
+  assert.equal(state.activeMapId, "M2");
+  assert.equal(state.model.nodes[0].title, "Toinen");
+
+  target.activateMap("M1", state.model.revision);
+  state = target.snapshot();
+  assert.equal(state.model.nodes[0].title, "Ensimmäinen");
+  target.deleteMap("M2", state.model.revision);
+  assert.deepEqual(target.snapshot().maps.map(map => map.id), ["M1"]);
 });
 
 test("text edited outside the app is preserved and flagged for review", async () => {
@@ -66,6 +95,6 @@ test("invalid embedded data cannot replace the current workspace", async () => {
   const target = new WorkspaceStore();
   target.apply({ expectedRevision: 0, summary: "Existing", operations: [{ type: "add_node", node: newNode("N1", { x: 0, y: 0 }) }] }, "test");
   const before = target.snapshot();
-  await assert.rejects(() => target.openDocumentBuffer(invalid, "bad.docx", 1), /Sopimuskartta-dataa/);
+  await assert.rejects(() => target.openDocumentBuffer(invalid, "bad.docx", 1), /Semantic Logic Mapper data/);
   assert.deepEqual(target.snapshot(), before);
 });

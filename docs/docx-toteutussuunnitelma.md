@@ -39,7 +39,7 @@ diagrammidata. Aja seuraavat kierrokset ja kirjaa ohjelmien tarkat versiot:
 - Editori → Word → LibreOffice → editori, sekä päinvastainen järjestys.
 - Toista tallennus useasti ja kokeile Tallenna nimellä -toimintoa.
 
-Hyväksy ratkaisu vasta kun kaikki node- ja nuolitiedot, sijainnit, lähdetekstit,
+Hyväksy ratkaisu vasta kun kaikki node- ja nuolitiedot, sijainnit, siteeratut lähdekatkelmat,
 lainaukset ja tunnisteet palautuvat semanttisesti samoina ja dokumentin teksti
 sekä muotoilut säilyvät. XML-tiedostonimi tai ZIP-tavujen järjestys voi muuttua.
 Jos Custom XML Part ei säily, kokeile standardin mukaista upotettua dataobjektia

@@ -1,4 +1,4 @@
-# Sopimuskartta: keskustelu, sopimusmalli ja yhteinen näkymä
+# Semantic Logic Mapper: conversation, semantic model and shared view
 
 Toteutus muuttaa prototyypin kertaluonteisesta graafin generoinnista yhteisen,
 versioidun sopimusmallin muokkaukseksi. Juristi käyttää työkalua, mutta kartan
@@ -54,7 +54,11 @@ takaa sisällön oikeellisuutta; juristi ja osapuolet tarkastavat luonnoksen.
 
 - Yksi paikallinen työtila; ei käyttäjätunnuksia tai monen organisaation palvelua.
 - Esitysnäkymän voi jakaa tavallisella kokoustyökalulla. Ei julkista jakolinkkiä.
-- DOCX sisältää sopimusmallin, lähdetekstit ja tekstiluonnoksen omassa dataosassa.
+- Sopimuskartan DOCX voi sisältää enintään 100 itsenäistä mappia ja aktiivisen
+  mapin tunnisteen. Vanha yhden mapin formaatti migroidaan avattaessa.
+- DOCX sisältää lisäksi vain nodeissa siteeratut sanatarkat
+  lähdekatkelmat paikantimineen sekä tekstiluonnoksen omassa dataosassa. Koko
+  lähdedokumentti säilyy Wordissa/Writerissa eikä sitä kopioida työtilaan.
   Keskustelu, API-avaimet, valinta ja kumouspino eivät kulje dokumentin mukana.
 - Sovellus ei ole laskentamoottori eikä suorita luonnollisen kielen ehtoja.
 - Tekstiluonnos näyttää lähdeversion ja ilmoittaa, jos malli on muuttunut sen jälkeen.

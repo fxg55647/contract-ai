@@ -3,15 +3,15 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { patchSchema, nodeIdSchema } from "../shared/model";
 import { SYSTEM_PROMPT } from "../shared/prompts";
-import { sourceDocumentIdSchema } from "../shared/sources";
+import { liveSourceApplicationSchema, sourceDocumentIdSchema } from "../shared/sources";
 
 const base = process.env.CONTRACT_SERVER_URL || "http://127.0.0.1:4317";
 const server = new McpServer(
-  { name: "sopimuskartta", version: "2.0.0" },
+  { name: "semantic-logic-mapper", version: "2.0.0" },
   {
     instructions:
       SYSTEM_PROMPT.replaceAll("submit_graph_changes", "apply_changes") +
-      "\nWhen asked to visualize a document: import its complete verbatim text using import_source_document, then read every page from read_source_fragments until nextOffset is null. Never assume a ChatGPT attachment is automatically available to this server. Do not summarize text during import; report incomplete extraction. Identify definitions, exceptions and cross-references before modeling. One fragment may support multiple nodes; one node may cite multiple fragments. Preserve all supported sourceRefs. Check every fragment for coverage and report unmodeled or uncertain parts; a valid reference alone does not prove the interpretation. Use save_draft to display requested drafts in the workspace. These tools do not call another AI provider." +
+      "\nWhen asked to visualize an external document, first tell the user to open that document in Microsoft Word or LibreOffice Writer. Do not model it until an open live document is available through the corresponding document connector. Read the live document there; never upload or copy the complete source into this workspace. After analysis, call register_live_source_excerpts with only the exact passages actually cited by graph nodes and stable locators such as bookmarks, headings or section identifiers. Then use the returned documentId and fragment IDs in sourceRefs. Identify definitions, exceptions and cross-references before modeling. Preserve all supported sourceRefs and report unmodeled or uncertain parts; a valid reference alone does not prove the interpretation. Use save_draft to display requested drafts in the workspace. These tools do not call another AI provider." +
       "\nRead get_workspace before editing. Use apply_changes with its revision as expectedRevision. The browser updates live. Never replace existing nodes merely to regenerate a graph. The workspace is local and shared with the person using the editor.",
   },
 );
@@ -58,6 +58,18 @@ server.registerTool(
   },
   () => result("/api/state"),
 );
+server.registerTool("create_map", {
+  description: "Create and activate a new map in the current cart file. Use when the user wants a separate visualization rather than replacing the active map.",
+  inputSchema: { title: z.string().trim().min(1).max(160).optional(), expectedRevision: z.number().int().nonnegative() },
+}, args => result("/api/maps", args));
+server.registerTool("select_map", {
+  description: "Activate one map already listed by get_workspace. Switching maps clears active-map undo history and increments the active revision.",
+  inputSchema: { id: z.string().regex(/^M[1-9]\d{0,5}$/), expectedRevision: z.number().int().nonnegative() },
+}, args => result("/api/maps/select", args));
+server.registerTool("delete_map", {
+  description: "Permanently delete one map from the cart file. Use only when explicitly requested. Deleting the last map creates a new empty replacement.",
+  inputSchema: { id: z.string().regex(/^M[1-9]\d{0,5}$/), expectedRevision: z.number().int().nonnegative() },
+}, args => result("/api/maps/delete", args));
 server.registerTool(
   "apply_changes",
   {
@@ -108,16 +120,28 @@ server.registerResource(
     ],
   }),
 );
-server.registerTool("import_source_document", {
-  description: "Store complete verbatim source text read-only. Server splits it into stable fragments. Maximum 60000 characters; never silently truncate. Does not generate a graph.",
-  inputSchema: { title: z.string().min(1).max(200), content: z.string().min(1).max(60000) },
-}, args => result("/api/sources", args));
+server.registerTool("register_live_source_excerpts", {
+  description: "Register only exact passages cited from an already open Word/Writer document, together with stable locators. Never send the complete source document. Returns IDs for node sourceRefs.",
+  inputSchema: {
+    title: z.string().trim().min(1).max(200),
+    application: liveSourceApplicationSchema,
+    externalDocumentId: z.string().trim().min(1).max(500),
+    excerpts: z.array(z.object({
+      locator: z.string().trim().min(1).max(500),
+      heading: z.string().trim().max(200).optional(),
+      quote: z.string().min(1).max(2400).refine(value => value.trim().length > 0),
+    }).strict()).min(1).max(500).refine(
+      excerpts => excerpts.reduce((total, excerpt) => total + excerpt.quote.length, 0) + 2 * (excerpts.length - 1) <= 60_000,
+      "Combined source excerpts must be at most 60,000 characters.",
+    ),
+  },
+}, args => result("/api/live-sources", args));
 server.registerTool("list_source_documents", {
-  description: "List source documents and fragment counts before reading them.",
+  description: "List registered source excerpt sets and fragment counts.",
   annotations: { readOnlyHint: true }, inputSchema: {},
 }, () => result("/api/sources"));
 server.registerTool("read_source_fragments", {
-  description: "Read exact source excerpts. Continue with nextOffset until null before claiming full coverage.",
+  description: "Read the exact cited excerpts retained for sourceRefs. This is not the complete source document; read that from the open Word/Writer session.",
   annotations: { readOnlyHint: true },
   inputSchema: { documentId: sourceDocumentIdSchema, offset: z.number().int().min(0).default(0), limit: z.number().int().min(1).max(30).default(10) },
 }, args => result(`/api/sources/${args.documentId}/fragments?offset=${args.offset}&limit=${args.limit}`));

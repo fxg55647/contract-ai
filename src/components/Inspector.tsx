@@ -46,25 +46,25 @@ export function Inspector({ node, model, sourceDocuments, readOnly, onClose, onC
           changes,
         },
       ],
-      `${id}: ${draft.title} päivitetty`,
+      `${id}: ${draft.title} updated`,
       baseRevision,
     );
     setSaving(false);
     if (ok) setEditing(false);
   }
   return (
-    <aside className="inspector" aria-label="Vaiheen tiedot">
+    <aside className="inspector" aria-label="Box details">
       <div className="panel-heading">
         <div>
-          <span className="eyebrow">VAIHEEN TIEDOT</span>
+          <span className="eyebrow">BOX DETAILS</span>
           <h2>
             {node.id}{" "}
-            {node.open && <span className="status status-open">Avoin</span>}
+            {node.open && <span className="status status-open">Open</span>}
           </h2>
         </div>
         <button
           className="icon-button"
-          aria-label="Sulje vaiheen tiedot"
+          aria-label="Close box details"
           onClick={onClose}
         >
           ×
@@ -75,20 +75,20 @@ export function Inspector({ node, model, sourceDocuments, readOnly, onClose, onC
           <>
             {model.revision !== baseRevision && (
               <div className="notice">
-                Rakenne muuttui muokkauksen aikana. Tekstisi säilyy, mutta
-                tallennus edellyttää uusimman version avaamista.
+                The map changed while you were editing. Your text is preserved,
+                but you must load the latest version before saving.
                 <button
                   onClick={() => {
                     setDraft({ ...node, sourceRefs: uniqueSourceReferences(node.sourceRefs) });
                     setBaseRevision(model.revision);
                   }}
                 >
-                  Hylkää lomakemuutokset ja lataa uusin
+                  Discard form changes and load latest
                 </button>
               </div>
             )}
             <label>
-              Otsikko
+              Title
               <input
                 value={draft.title}
                 onChange={(e) => field("title", e.target.value)}
@@ -96,7 +96,7 @@ export function Inspector({ node, model, sourceDocuments, readOnly, onClose, onC
               />
             </label>
             <label>
-              Sisältö
+              Content
               <textarea
                 value={draft.text}
                 onChange={(e) => field("text", e.target.value)}
@@ -105,16 +105,16 @@ export function Inspector({ node, model, sourceDocuments, readOnly, onClose, onC
               />
             </label>
             <section className="source-reference-editor" aria-labelledby="node-label-heading">
-              <span className="field-label" id="node-label-heading">Merkinnät</span>
+              <span className="field-label" id="node-label-heading">Labels</span>
               {draft.open ? (
                 <div className="removable-labels">
                   <span className="removable-label">
-                    <span>Avoin</span>
+                    <span>Open</span>
                     <button
                       type="button"
                       className="removable-label-close"
-                      aria-label="Poista Avoin-merkintä"
-                      title="Poista merkintä"
+                      aria-label="Remove Open label"
+                      title="Remove label"
                       onClick={() => setDraft((current) => ({ ...current, open: false }))}
                     >
                       ×
@@ -127,13 +127,13 @@ export function Inspector({ node, model, sourceDocuments, readOnly, onClose, onC
                   className="add-label-button"
                   onClick={() => setDraft((current) => ({ ...current, open: true }))}
                 >
-                  + Merkitse avoimeksi
+                  + Mark as open
                 </button>
               )}
             </section>
             {draft.sourceRefs.length > 0 && (
               <section className="source-reference-editor" aria-labelledby="source-reference-heading">
-                <span className="field-label" id="source-reference-heading">Lähdeviitteet</span>
+                <span className="field-label" id="source-reference-heading">Source references</span>
                 <div className="removable-labels">
                   {draft.sourceRefs.map((reference, index) => {
                     const document = sourceDocuments.find((candidate) => candidate.id === reference.documentId);
@@ -145,8 +145,8 @@ export function Inspector({ node, model, sourceDocuments, readOnly, onClose, onC
                         <button
                           type="button"
                           className="removable-label-close"
-                          aria-label={`Poista lähdeviite ${reference.fragmentId}`}
-                          title="Poista lähdeviite"
+                          aria-label={`Remove source reference ${reference.fragmentId}`}
+                          title="Remove source reference"
                           onClick={() => removeSourceReference(index)}
                         >
                           ×
@@ -155,7 +155,7 @@ export function Inspector({ node, model, sourceDocuments, readOnly, onClose, onC
                     );
                   })}
                 </div>
-                <p className="field-help">Poistetut viitteet eivät enää näy tässä vaiheessa.</p>
+                <p className="field-help">Removed references will no longer appear in this box.</p>
               </section>
             )}
             <div className="button-row">
@@ -168,39 +168,39 @@ export function Inspector({ node, model, sourceDocuments, readOnly, onClose, onC
                 }
                 onClick={() => void save()}
               >
-                Tallenna vaihe
+                Save box
               </button>
               <button disabled={saving} onClick={() => setEditing(false)}>
-                Peruuta
+                Cancel
               </button>
             </div>
           </>
         ) : (
           <>
             <h3 className="inspector-title">{node.title}</h3>
-            <p className="lead preserve">{node.text || "Sisältöä ei vielä ole."}</p>
+            <p className="lead preserve">{node.text || "No content yet."}</p>
             {sourceExcerpts.length > 0 && (
-              <section className="source-excerpts source-excerpts-prominent" aria-label="Alkuperäiset sopimuskohdat">
+              <section className="source-excerpts source-excerpts-prominent" aria-label="Original source excerpts">
                 <div className="source-excerpts-heading">
                   <div>
-                    <span className="eyebrow">ALKUPERÄINEN SOPIMUSTEKSTI</span>
-                    <h3>{sourceExcerpts.length} {sourceExcerpts.length === 1 ? "lähdekohta" : "lähdekohtaa"}</h3>
+                    <span className="eyebrow">ORIGINAL SOURCE TEXT</span>
+                    <h3>{sourceExcerpts.length} {sourceExcerpts.length === 1 ? "source excerpt" : "source excerpts"}</h3>
                   </div>
-                  <span className="read-only-tag">Vain luku</span>
+                  <span className="read-only-tag">Read only</span>
                 </div>
                 {sourceExcerpts.map(({ document, fragment, quote }, index) => (
                   <details className="source-excerpt" key={`${fragment.id}-${index}`} open>
                     <summary>
                       <span>{fragment.heading || document.title}</span>
-                      <small>{fragment.id}</small>
+                      <small>{fragment.locator ? `${fragment.id} · ${fragment.locator}` : fragment.id}</small>
                     </summary>
                     <blockquote>{quote ?? fragment.text}</blockquote>
                     {quote && quote !== fragment.text && (
-                      <details><summary>Näytä koko lähdekappale</summary><blockquote>{fragment.text}</blockquote></details>
+                      <details><summary>Show full source passage</summary><blockquote>{fragment.text}</blockquote></details>
                     )}
                   </details>
                 ))}
-                <p className="source-note">Sanatarkat, muuttumattomat otteet käyttäjän liittämästä sopimuksesta.</p>
+                <p className="source-note">Exact excerpts from the open Word/Writer source. The complete source document is not stored in Semantic Logic Mapper.</p>
               </section>
             )}
             {!readOnly && (
@@ -213,7 +213,7 @@ export function Inspector({ node, model, sourceDocuments, readOnly, onClose, onC
                     setEditing(true);
                   }}
                 >
-                  Muokkaa vaihetta
+                  Edit box
                 </button>
               </div>
             )}

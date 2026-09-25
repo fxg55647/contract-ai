@@ -38,9 +38,20 @@ test("HTTP source import, DOCX save and live editing work without AI credentials
       operations: [{ type: "set_title", title: "Vanha" }],
     });
     assert.equal(conflict.status, 409);
+    const liveSource = await post("/api/live-sources", {
+      title: "Writer agreement",
+      application: "libreoffice-writer",
+      externalDocumentId: "writer-doc-1",
+      excerpts: [{ locator: "bookmark:delivery", heading: "1. Delivery", quote: "Deliver within 14 days." }],
+    });
+    assert.equal(liveSource.status, 200);
+    const liveSourceBody = await liveSource.json();
+    assert.equal(liveSourceBody.fragments[0].locator, "bookmark:delivery");
+    assert.equal(store.snapshot().sourceDocuments[0].content, "Deliver within 14 days.");
+    assert.equal(store.snapshot().sourceDocuments[0].origin?.kind, "live-document");
     const source = await post("/api/sources", { title: "Agreement", content: "  1. Delivery\nDeliver within 14 days.  " });
     assert.equal(source.status, 200);
-    assert.equal(store.snapshot().sourceDocuments[0].content, "  1. Delivery\nDeliver within 14 days.  ");
+    assert.equal(store.snapshot().sourceDocuments[1].content, "  1. Delivery\nDeliver within 14 days.  ");
     const saved = await fetch(base + "/api/document/save", { method: "POST" });
     assert.equal(saved.status, 200);
     assert.match(saved.headers.get("content-type") ?? "", /wordprocessingml/);
@@ -55,7 +66,7 @@ test("HTTP source import, DOCX save and live editing work without AI credentials
       body: docx,
     });
     assert.equal(opened.status, 200);
-    assert.equal((await opened.json()).sourceDocuments.length, 1);
+    assert.equal((await opened.json()).sourceDocuments.length, 2);
     const ai = await post("/api/chat", { apiKey: "test-secret-never-saved" });
     assert.equal(ai.status, 404);
     assert.ok(!JSON.stringify(store.snapshot()).includes("test-secret-never-saved"));
@@ -63,7 +74,7 @@ test("HTTP source import, DOCX save and live editing work without AI credentials
     const stream = await fetch(base + "/api/events", { signal: abort.signal });
     const reader = stream.body!.getReader();
     const first = await reader.read();
-    assert.match(new TextDecoder().decode(first.value), /Uusi sopimusrakenne/);
+    assert.match(new TextDecoder().decode(first.value), /New semantic map/);
     store.select("N1");
     const second = await reader.read();
     assert.match(new TextDecoder().decode(second.value), /"selection":"N1"/);

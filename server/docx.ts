@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import JSZip from "jszip";
-import { embeddedDocumentSchema, type EmbeddedDocument } from "../shared/document";
+import { embeddedDocumentSchema, type EmbeddedDocument, type EmbeddedDocumentV2 } from "../shared/document";
 import { ModelError } from "../shared/model";
 
 const NAMESPACE = "urn:sopimuskartta:document:1";
@@ -38,7 +38,7 @@ function fingerprintDocumentXml(xml: string) {
 }
 
 function safeFileName(value: string) {
-  const name = value.replaceAll("\\", "/").split("/").at(-1)?.trim() || "sopimus.docx";
+  const name = value.replaceAll("\\", "/").split("/").at(-1)?.trim() || "semantic-logic-map.docx";
   const withoutControls = name.replace(/[\u0000-\u001f<>:"|?*]/g, "_").slice(0, 180);
   return withoutControls.toLowerCase().endsWith(".docx") ? withoutControls : `${withoutControls}.docx`;
 }
@@ -48,39 +48,39 @@ async function loadZip(buffer: Buffer) {
   try {
     zip = await JSZip.loadAsync(buffer, { checkCRC32: true });
   } catch {
-    throw new ModelError("Tiedosto ei ole kelvollinen DOCX-dokumentti.");
+    throw new ModelError("The file is not a valid DOCX document.");
   }
   const entries = Object.values(zip.files);
-  if (entries.length > MAX_ENTRIES) throw new ModelError("DOCX sisältää liian monta osaa.");
+  if (entries.length > MAX_ENTRIES) throw new ModelError("The DOCX contains too many parts.");
   let total = 0;
   for (const entry of entries) {
     const unsafeName = (entry as typeof entry & { unsafeOriginalName?: string }).unsafeOriginalName;
     if (unsafeName && unsafeName !== entry.name)
-      throw new ModelError("DOCX sisältää turvattoman tiedostopolun.");
+      throw new ModelError("The DOCX contains an unsafe file path.");
     if (entry.name.startsWith("/") || entry.name.includes("\\") || entry.name.split("/").includes(".."))
-      throw new ModelError("DOCX sisältää turvattoman tiedostopolun.");
+      throw new ModelError("The DOCX contains an unsafe file path.");
     total += Number((entry as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize ?? 0);
-    if (total > MAX_UNCOMPRESSED) throw new ModelError("DOCX on purettuna liian suuri.");
+    if (total > MAX_UNCOMPRESSED) throw new ModelError("The uncompressed DOCX is too large.");
   }
   if (entries.some((entry) => /(^|\/)vbaProject\.bin$/i.test(entry.name)))
-    throw new ModelError("Makroja sisältäviä Word-tiedostoja ei tueta.");
+    throw new ModelError("Macro-enabled Word documents are not supported.");
   const types = await zip.file("[Content_Types].xml")?.async("string");
   const documentXml = await zip.file("word/document.xml")?.async("string");
   if (!types || !documentXml || !types.includes("wordprocessingml.document.main+xml"))
-    throw new ModelError("Tiedosto ei ole tavallinen DOCX-dokumentti.");
-  if (/macroEnabled/i.test(types)) throw new ModelError("Makroja sisältäviä Word-tiedostoja ei tueta.");
+    throw new ModelError("The file is not a standard DOCX document.");
+  if (/macroEnabled/i.test(types)) throw new ModelError("Macro-enabled Word documents are not supported.");
   return { zip, documentXml };
 }
 
 function readEmbedded(xml: string) {
   if (!new RegExp(`xmlns(?::[\\w.-]+)?\\s*=\\s*["']${NAMESPACE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']`).test(xml))
-    throw new ModelError("DOCX:n Sopimuskartta-dataosa on tuntematon.");
+    throw new ModelError("The Semantic Logic Mapper data part is not recognized.");
   const match = xml.match(/<(?:[\w.-]+:)?data\b[^>]*\bencoding\s*=\s*["']base64["'][^>]*>([A-Za-z0-9+/=\s]+)<\/(?:[\w.-]+:)?data>/);
-  if (!match) throw new ModelError("DOCX:n Sopimuskartta-dataosa on vioittunut.");
+  if (!match) throw new ModelError("The Semantic Logic Mapper data part is damaged.");
   try {
     return embeddedDocumentSchema.parse(JSON.parse(Buffer.from(match[1].replace(/\s/g, ""), "base64").toString("utf8")));
   } catch {
-    throw new ModelError("DOCX:n Sopimuskartta-dataa ei voitu lukea.");
+    throw new ModelError("The Semantic Logic Mapper data could not be read.");
   }
 }
 
@@ -91,12 +91,12 @@ async function findEmbeddedParts(zip: JSZip) {
     if (new RegExp(`xmlns(?::[\\w.-]+)?\\s*=\\s*["']${NAMESPACE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']`).test(xml))
       matches.push({ path, xml });
   }
-  if (matches.length > 1) throw new ModelError("DOCX sisältää useita Sopimuskartta-dataosia.");
+  if (matches.length > 1) throw new ModelError("The DOCX contains multiple Semantic Logic Mapper data parts.");
   return matches[0] ?? null;
 }
 
 export async function readDocx(buffer: Buffer, originalName: string): Promise<ReadDocx> {
-  if (!buffer.length) throw new ModelError("DOCX-tiedosto on tyhjä.");
+  if (!buffer.length) throw new ModelError("The DOCX file is empty.");
   const { zip, documentXml } = await loadZip(buffer);
   const textFingerprint = fingerprintDocumentXml(documentXml);
   const dataPart = await findEmbeddedParts(zip);
@@ -128,7 +128,7 @@ function appendBeforeClose(xml: string, close: string, content: string) {
   return xml.replace(close, `${content}${close}`);
 }
 
-export async function writeDocx(base64: string | null, payload: Omit<EmbeddedDocument, "documentTextFingerprint">) {
+export async function writeDocx(base64: string | null, payload: Omit<EmbeddedDocumentV2, "documentTextFingerprint">) {
   let zip: JSZip;
   let documentXml: string;
   if (base64) {
@@ -136,7 +136,8 @@ export async function writeDocx(base64: string | null, payload: Omit<EmbeddedDoc
     zip = loaded.zip;
     documentXml = loaded.documentXml;
   } else {
-    zip = minimalPackage(payload.model.title, payload.draft?.text ?? null);
+    const activeMap = payload.maps.find(map => map.id === payload.activeMapId)!;
+    zip = minimalPackage(activeMap.model.title, activeMap.draft?.text ?? null);
     documentXml = (await zip.file("word/document.xml")!.async("string"));
   }
   const existingPart = await findEmbeddedParts(zip);

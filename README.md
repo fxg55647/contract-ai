@@ -1,4 +1,4 @@
-# Sopimuskartta / contract-ai
+# Semantic Logic Mapper
 
 Keskustele sopimuksesta, tee sen toimintalogiikka näkyväksi ja tarkentakaa sitä
 yhdessä. Juristi voi muokata rakennetta käsin tai ohjata sitä ulkoisella
@@ -28,28 +28,40 @@ Avaa tällöin **http://127.0.0.1:4317**.
 
 ## ChatGPT-vetoinen työskentely
 
-Sovellus on lähdeaineiston ja visuaalisen mallin työtila. Keskustele ChatGPT:ssä
+Sovellus on visuaalisen mallin työtila. Keskustele ChatGPT:ssä
 ja anna sille MCP-työkalut käyttöön. Muitakin standardia MCP:tä tukevia asiakkaita
 voi kokeilla; niiden ohjeiden noudattaminen ja tiedostokäsittely on testattava erikseen.
 Sovellus ei tee mallipalvelukutsuja eikä kysy AI-API-avainta.
 
-Liitä teksti sovelluksen Lähdeaineisto-paneeliin tai pyydä avustajaa käyttämään
-import_source_document-työkalua. Tuonti säilyttää tekstin ja pilkkoo sen ohjelmallisesti.
-Enimmäiskoko on 60 000 merkkiä dokumenttia kohti. Tiedoston liittäminen avustajaan
-ei automaattisesti siirrä sitä tähän työtilaan: avustajan on tuotava sen koko teksti.
-PDF/Word-tiedostojen tekstin poiminta jää asiakkaalle; tarkista poiminnan kattavuus.
+Ulkoisen dokumentin visualisointi alkaa aina avaamalla alkuperäinen tiedosto
+Microsoft Wordissa tai LibreOffice Writerissa. Avustaja lukee avoimen dokumentin
+elävän dokumenttiyhteyden kautta. Koko lähdetekstiä tai lähdetiedostoa ei kopioida
+contract-editoriin. Työtilaan rekisteröidään vain kartan nodeissa käytetyt
+sanatarkat katkelmat ja niiden vakaat paikantimet.
 
-MCP antaa avustajalle työjärjestyksen: tuo lähde, lue kaikki katkelmasivut,
+MCP antaa avustajalle työjärjestyksen: varmista avoin Word/Writer-dokumentti,
+lue ja analysoi se siellä, rekisteröi käytetyt lähdekatkelmat,
 mallinna ehdot ja seuraukset, liitä lähdeviitteet ja raportoi kattavuus.
 Skeemavalidointi tarkistaa viitteiden olemassaolon, ei tulkinnan oikeellisuutta.
 
-Avaa ja tallenna työ selaimessa DOCX-dokumenttina. Diagrammin muokattava rakenne,
-lähdetekstit ja tekstiluonnos kulkevat dokumentin omassa dataosassa. Word ja
-LibreOffice näyttävät tavallisen dokumenttitekstin; erillisiä JSON-tiedostoja
-ei käytetä. Jos dokumenttitekstiä muutetaan tekstinkäsittelyohjelmassa, editori
-pyytää tarkistamaan diagrammin ja lähdeviitteet seuraavan avauksen yhteydessä.
+Selaimen **Avaa karttatiedosto** ja **Tallenna karttatiedosto** käsittelevät
+Sopimuskartan omaa DOCX-pakettia, eivät avoinna olevaa lähdesopimusta. Diagrammin
+muokattava rakenne, käytetyt lähdekatkelmat paikantimineen ja tekstiluonnos
+kulkevat paketin dataosassa. Alkuperäinen sopimusteksti tallennetaan edelleen
+Wordissa tai Writerissa. Käyttöliittymän **Ohje**-painike näyttää tämän
+tallennusjaon milloin tahansa.
+
+Yksi karttatiedosto voi sisältää enintään 100 erillistä mappia. **Mapit**-paneeli
+listaa niiden nimet ja laatikkomäärät sekä antaa avata, luoda ja poistaa mappeja
+yksitellen. Vanha yhden mapin karttatiedosto avautuu automaattisesti yhden mapin
+luettelona. Mapin poistaminen ei muuta Word/Writer-lähdedokumenttia.
 
 ## Ulkoisen tekoälyn MCP-yhteys
+
+> **Pikaohje:** koko Codex–LibreOffice–Nelson–contract-editor-ketjun
+> käynnistys, asetukset, terveystarkistukset ja vianrajaus löytyvät oppaasta
+> [MCP-opas: Codex, LibreOffice ja contract-editor](docs/mcp-libreoffice-operations.md).
+> Kun palvelut ovat käynnissä, tarkista ne komennolla `npm run mcp:check`.
 
 Palvelin toteuttaa standardin **stdio MCP** -rajapinnan. Käynnistä ensin
 `npm run dev` tai `npm start`. Lisää sitten MCP-asiakkaaseen seuraava palvelin
@@ -102,8 +114,12 @@ näkyvät selaimessa. MCP-yhteys ei edellytä AI-avainta sovelluksessa. ChatGPT-
 - Kumoaminen/palauttaminen koskee yhteistä mallia, myös MCP-muutoksia.
 - **Esitysnäkymä** piilottaa keskustelun ja muokkaustoiminnot. Jaa selainikkuna
   tavallisen kokoustyökalun ruudunjaolla. Sovellus ei luo julkista jakolinkkiä.
-- **Avaa dokumentti / Tallenna dokumentti** käsittelee yhtä DOCX-tiedostoa,
-  jonka mukana diagrammi ja lähteet kulkevat.
+- **Avaa karttatiedosto / Tallenna karttatiedosto** käsittelee Sopimuskartan
+  DOCX-pakettia, jonka mukana diagrammi ja käytetyt lähdekatkelmat kulkevat.
+  Painikkeet eivät avaa tai tallenna Word/Writer-lähdesopimusta.
+- **Ohje** näyttää visualisoinnin aloituksen ja tallennuksen työnjaon.
+- **Mapit** näyttää kaikki karttatiedoston visualisoinnit ja mahdollistaa niiden
+  avaamisen, luonnin ja yksittäisen poistamisen.
 - Tekstiluonnoksen tuottaa ulkoinen avustaja save_draft-työkalulla ja näyttää varoituksen, kun rakenne on muuttunut
   sen muodostamisen jälkeen. Mallivastaus näytetään tekstinä, ei suoritettavana HTML:nä.
 
@@ -111,7 +127,7 @@ näkyvät selaimessa. MCP-yhteys ei edellytä AI-avainta sovelluksessa. ChatGPT-
 
 Työtila palautuu paikallisesti `.contract-data/workspace.json`-tiedostosta.
 Käyttäjälle siirrettävä tiedosto on DOCX. Paikallinen palautumistiedosto sisältää
-aktiivisen dokumentin, sopimusmallin, tekstiluonnoksen ja kumoamishistorian eikä
+aktiivisen kartan, käytetyt lähdekatkelmat, tekstiluonnoksen ja kumoamishistorian eikä
 ole salattu. `CONTRACT_DATA_FILE` vaihtaa sen sijainnin.
 Palvelin kuuntelee vain paikallista loopback-osoitetta ja torjuu vieraan
 alkuperän selainpyynnöt. Tämä on yksi paikallinen työtila, ei julkinen
@@ -132,10 +148,17 @@ Selainkokeet käyttävät Playwrightia. Jos Chromium puuttuu, asenna se komennol
 [Arkkitehtuuri, mallin merkitys ja rajat](docs/architecture.md).
 ## Lähdetyökalut
 
-- import_source_document: tallenna alkuperäinen teksti ja palauta dokumentin tunniste.
-- list_source_documents: luettele dokumentit ja katkelmien määrät.
-- read_source_fragments: lue katkelmat erissä; jatka nextOffset-arvolla kunnes null.
+- register_live_source_excerpts: rekisteröi avoimesta Word/Writer-dokumentista
+  vain kartassa siteeratut sanatarkat katkelmat ja vakaat paikantimet.
+- list_source_documents: luettele rekisteröidyt lähdekatkelmakokonaisuudet.
+- read_source_fragments: lue työtilaan talletetut siteeratut katkelmat. Koko
+  lähdedokumentti luetaan aina Word/Writer-yhteydestä.
 - save_draft: tallenna avustajan laatima luonnos nykyiseen malliversioon.
 
-Esimerkkipyyntö: ”Tuo tämä sopimus muuttumattomaksi lähteeksi. Lue kaikki katkelmat,
-muodosta lähteistetty toimintakartta ja kerro, mitä jäi mallintamatta.”
+Mappeja hallitaan MCP-työkaluilla `create_map`, `select_map` ja `delete_map`.
+`get_workspace` kertoo aktiivisen mapin ja kaikkien mappien tiiviin luettelon.
+`delete_map`-työkalua käytetään vain käyttäjän nimenomaisesta pyynnöstä.
+
+Esimerkkipyyntö: ”Lue Writerissa avoinna oleva sopimus, muodosta lähteistetty
+toimintakartta ja kerro, mitä jäi mallintamatta. Tallenna Sopimuskarttaan vain
+käytetyt sanatarkat katkelmat ja niiden paikantimet.”

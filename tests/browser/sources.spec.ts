@@ -16,17 +16,17 @@ test("source text and exact quote travel inside the opened DOCX", async ({ page,
   const document = await store.saveDocument();
 
   await page.goto("/");
-  await page.getByLabel("Avaa Word-dokumentti").setInputFiles({
+  await page.getByLabel("Open Semantic Logic Mapper DOCX file").setInputFiles({
     name: "agreement.docx",
     mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     buffer: document.buffer,
   });
-  await expect(page.locator(".workspace-status")).toContainText("agreement.docx · tallennettu");
+  await expect(page.locator(".workspace-status")).toContainText("agreement.docx · saved");
   await expect.poll(async () => {
     const state = await (await request.get("/api/state")).json();
     return state.model.nodes[0]?.sourceRefs?.[0]?.quote;
   }).toBe("The supplier delivers within 14 days.");
   await page.locator('.react-flow__node[data-id="N1"]').click();
-  await expect(page.getByRole("complementary", { name: "Vaiheen tiedot" }).locator("blockquote").first()).toContainText("The supplier delivers within 14 days.");
+  await expect(page.getByRole("complementary", { name: "Box details" }).locator("blockquote").first()).toContainText("The supplier delivers within 14 days.");
   await expect(page.getByText("1. Delivery", { exact: true })).toBeVisible();
 });

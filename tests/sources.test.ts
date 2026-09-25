@@ -41,7 +41,7 @@ test("workspace keeps immutable sources and rejects invented references", async 
   node.sourceRefs = [{ documentId: document.id, fragmentId: document.fragments[0].id }];
   store.apply({ expectedRevision: 0, summary: "Lähteistetty vaihe", operations: [{ type: "add_node", node }] }, "test");
   assert.equal(store.snapshot().model.nodes[0].sourceRefs[0].fragmentId, "D1-F1");
-  assert.throws(() => store.apply({ expectedRevision: 1, summary: "Keksitty lainaus", operations: [{ type: "update_node", id: "N1", changes: { sourceRefs: [{ documentId: "D1", fragmentId: "D1-F1", quote: "Toimitus tehdään 30 päivässä." }] } }] }, "test"), /sanatarkka/);
+  assert.throws(() => store.apply({ expectedRevision: 1, summary: "Keksitty lainaus", operations: [{ type: "update_node", id: "N1", changes: { sourceRefs: [{ documentId: "D1", fragmentId: "D1-F1", quote: "Toimitus tehdään 30 päivässä." }] } }] }, "test"), /exact substring/);
   store.apply({ expectedRevision: 1, summary: "Tarkka lainaus", operations: [{ type: "update_node", id: "N1", changes: { sourceRefs: [{ documentId: "D1", fragmentId: "D1-F1", quote: "Toimitus tehdään 14 päivässä." }] } }] }, "test");
   store.apply({ expectedRevision: 2, summary: "Siirto", operations: [{ type: "update_node", id: "N1", changes: { position: { x: 20, y: 30 } } }] }, "test");
   assert.equal(store.snapshot().model.nodes[0].sourceRefs[0].quote, "Toimitus tehdään 14 päivässä.");
@@ -54,7 +54,7 @@ test("workspace keeps immutable sources and rejects invented references", async 
     expectedRevision: 3,
     summary: "Virheellinen viite",
     operations: [{ type: "update_node", id: "N1", changes: { sourceRefs: [{ documentId: "D1", fragmentId: "D1-F99" }] } }],
-  }, "test"), /puuttuvaan lähdekatkelmaan/);
+  }, "test"), /missing source excerpt/);
 });
 
 test("a node keeps each source fragment only once", () => {
